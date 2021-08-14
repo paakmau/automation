@@ -12,8 +12,8 @@ pub struct Pixel {
 }
 
 impl Pixel {
-    pub fn new(rgba: [u8; 4]) -> Pixel {
-        Pixel {
+    pub fn new(rgba: [u8; 4]) -> Self {
+        Self {
             r: rgba[0],
             g: rgba[1],
             b: rgba[2],
@@ -25,8 +25,8 @@ impl Pixel {
 pub struct Screenshot(RgbaImage);
 
 impl Screenshot {
-    pub fn from_raw(width: u32, height: u32, rgba_data: Vec<u8>) -> Option<Screenshot> {
-        RgbaImage::from_raw(width, height, rgba_data).map(|rgba_image| Screenshot(rgba_image))
+    pub fn from_raw(width: u32, height: u32, rgba_data: Vec<u8>) -> Option<Self> {
+        RgbaImage::from_raw(width, height, rgba_data).map(|rgba_image| Self(rgba_image))
     }
 
     pub fn save<T>(&self, path: T) -> Result<()>

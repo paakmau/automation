@@ -11,9 +11,9 @@ pub struct Simulator {
 }
 
 impl Simulator {
-    pub fn new() -> Simulator {
+    pub fn new() -> Self {
         let context = Context::new().expect("Failed to get context");
-        Simulator { context }
+        Self { context }
     }
 
     pub fn mouse_move_to(&mut self, x: u32, y: u32) {

@@ -9,10 +9,10 @@ pub struct Capturer {
 }
 
 impl Capturer {
-    pub fn new() -> Capturer {
+    pub fn new() -> Self {
         let display = scrap::Display::primary().expect("Failed to find primary display.");
         let capturer = scrap::Capturer::new(display).expect("Failed to begin capture.");
-        Capturer { capturer }
+        Self { capturer }
     }
 
     pub fn screen_size(&self) -> (u32, u32) {
