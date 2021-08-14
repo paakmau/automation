@@ -20,6 +20,14 @@ impl Pixel {
             a: rgba[3],
         }
     }
+
+    pub fn similar_to(&self, pixel: Self, threshold: f32) -> bool {
+        (((self.r - pixel.r) * (self.r - pixel.r)
+            + (self.g - pixel.g) * (self.g - pixel.g)
+            + (self.b - pixel.b) * (self.b - pixel.b)) as f32)
+            .sqrt()
+            < threshold
+    }
 }
 
 pub struct Screenshot(RgbaImage);
