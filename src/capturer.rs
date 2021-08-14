@@ -41,13 +41,13 @@ impl Capturer {
                 }
             };
 
-            // Flip the ABGR image into a RGBA image.
-            let mut flipped_bits = Vec::with_capacity(w * h * 4);
+            // Flip the ABGR image into a RGB image.
+            let mut flipped_bits = Vec::with_capacity(w * h * 3);
             let stride = buffer.len() / h;
             for y in 0..h {
                 for x in 0..w {
                     let i = stride * y + 4 * x;
-                    flipped_bits.extend_from_slice(&[buffer[i + 2], buffer[i + 1], buffer[i], 255]);
+                    flipped_bits.extend_from_slice(&[buffer[i + 2], buffer[i + 1], buffer[i]]);
                 }
             }
 
