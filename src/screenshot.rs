@@ -47,6 +47,14 @@ impl Screenshot {
         }
     }
 
+    pub fn width(&self) -> u32 {
+        self.0.width()
+    }
+
+    pub fn height(&self) -> u32 {
+        self.0.height()
+    }
+
     pub fn pixel(&self, x: u32, y: u32) -> Pixel {
         Pixel::new(self.0.get_pixel(x, y).0)
     }
