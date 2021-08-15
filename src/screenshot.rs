@@ -53,7 +53,7 @@ impl Screenshot {
     {
         match image::open(path) {
             Ok(dynamic_img) => Ok(Screenshot {
-                image: dynamic_img.to_rgb8(),
+                image: dynamic_img.into_rgb8(),
             }),
             _ => Err("Unknown error".to_string()),
         }
