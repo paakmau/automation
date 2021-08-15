@@ -4,6 +4,7 @@ use image::{Rgb, RgbImage};
 
 use crate::error::Result;
 
+#[derive(PartialEq)]
 pub struct Pixel<'a> {
     rgb: &'a Rgb<u8>,
 }
