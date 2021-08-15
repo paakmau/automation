@@ -1,4 +1,3 @@
-use std::cmp::PartialEq;
 use std::path::Path;
 
 use image::{Rgb, RgbImage};
@@ -24,6 +23,15 @@ impl<'a> Pixel<'a> {
 
     pub fn b(&self) -> u8 {
         self.rgb.0[2]
+    }
+
+    pub fn luma(&self) -> u8 {
+        const SRGB_LUMA: [u32; 3] = [2126, 7152, 722];
+        let mut luma = 0u32;
+        for i in 0..SRGB_LUMA.len() {
+            luma += self.rgb.0[i] as u32 * SRGB_LUMA[i];
+        }
+        (luma / 10000u32) as u8
     }
 }
 
