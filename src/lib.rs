@@ -1,6 +1,7 @@
 mod capturer;
 mod error;
 mod finder;
+pub mod fsm;
 mod screenshot;
 mod simulator;
 
