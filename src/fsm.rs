@@ -251,3 +251,275 @@ impl Fsm {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct Eat {
+        node: Node,
+        food: String,
+        food_sum: u32,
+        food_count: u32,
+    }
+    impl Eat {
+        fn new(food: String, food_sum: u32) -> Eat {
+            Eat {
+                node: Node::new(),
+                food,
+                food_sum,
+                food_count: food_sum,
+            }
+        }
+    }
+    impl Deref for Eat {
+        type Target = Node;
+        fn deref(&self) -> &Self::Target {
+            &self.node
+        }
+    }
+    impl DerefMut for Eat {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.node
+        }
+    }
+    impl State for Eat {
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn enter(&mut self) {
+            self.food_count = self.food_sum;
+            self.food_count -= 1;
+        }
+        fn tick(&mut self) {
+            self.food_count -= 1;
+        }
+    }
+
+    struct Nap {
+        node: Node,
+        tick_count: u32,
+    }
+    impl Nap {
+        fn new(tick_count: u32) -> Nap {
+            Nap {
+                node: Node::new(),
+                tick_count,
+            }
+        }
+    }
+    impl Deref for Nap {
+        type Target = Node;
+        fn deref(&self) -> &Self::Target {
+            &self.node
+        }
+    }
+    impl DerefMut for Nap {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.node
+        }
+    }
+    impl State for Nap {
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn tick(&mut self) {
+            self.tick_count -= 1;
+        }
+    }
+
+    struct EatFinished {
+        edge: Edge,
+        food: String,
+    }
+    impl EatFinished {
+        fn new(src_id: StateId, dest_id: StateId, food: String) -> EatFinished {
+            EatFinished {
+                edge: Edge::new(src_id, dest_id),
+                food,
+            }
+        }
+    }
+    impl Deref for EatFinished {
+        type Target = Edge;
+        fn deref(&self) -> &Self::Target {
+            &self.edge
+        }
+    }
+    impl Transition for EatFinished {
+        fn satisfied(&self, state: &dyn State) -> bool {
+            if let Some(state) = state.as_any().downcast_ref::<Eat>() {
+                return state.food_count == 0 && state.food == self.food;
+            }
+            false
+        }
+    }
+
+    struct NapOnce {
+        edge: Edge,
+    }
+    impl NapOnce {
+        fn new(src_id: StateId, dest_id: StateId) -> NapOnce {
+            NapOnce {
+                edge: Edge::new(src_id, dest_id),
+            }
+        }
+    }
+    impl Deref for NapOnce {
+        type Target = Edge;
+        fn deref(&self) -> &Self::Target {
+            &self.edge
+        }
+    }
+    impl Transition for NapOnce {
+        fn satisfied(&self, state: &dyn State) -> bool {
+            if let Some(state) = state.as_any().downcast_ref::<Nap>() {
+                return state.tick_count > 0;
+            }
+            false
+        }
+    }
+
+    struct NapFinished {
+        edge: Edge,
+    }
+    impl NapFinished {
+        fn new(src_id: StateId, dest_id: StateId) -> NapFinished {
+            NapFinished {
+                edge: Edge::new(src_id, dest_id),
+            }
+        }
+    }
+    impl Deref for NapFinished {
+        type Target = Edge;
+        fn deref(&self) -> &Self::Target {
+            &self.edge
+        }
+    }
+    impl Transition for NapFinished {
+        fn satisfied(&self, state: &dyn State) -> bool {
+            if let Some(state) = state.as_any().downcast_ref::<Nap>() {
+                return state.tick_count == 0;
+            }
+            false
+        }
+    }
+
+    #[test]
+    fn exit_directly() {
+        let mut fsm = Fsm::new();
+        let entry_id = fsm.entry_state_id();
+        let exit_id = fsm.exit_state_id();
+        fsm.add_transition(Box::new(Direct::new(entry_id, exit_id)));
+        assert_eq!(fsm.curr_state_id(), entry_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), exit_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), exit_id);
+    }
+
+    #[test]
+    fn eat_fish_and_then_bread() {
+        let mut fsm = Fsm::new();
+        let entry_id = fsm.entry_state_id();
+        let exit_id = fsm.exit_state_id();
+        let eat_fish_id = fsm.add_state(Box::new(Eat::new("Fish".to_string(), 2)));
+        let eat_chip_id = fsm.add_state(Box::new(Eat::new("Chip".to_string(), 3)));
+
+        fsm.add_transition(Box::new(Direct::new(entry_id, eat_fish_id)));
+        fsm.add_transition(Box::new(EatFinished::new(
+            eat_fish_id,
+            eat_chip_id,
+            "Fish".to_string(),
+        )));
+        fsm.add_transition(Box::new(EatFinished::new(
+            eat_fish_id,
+            exit_id,
+            "Chip".to_string(),
+        )));
+        fsm.add_transition(Box::new(EatFinished::new(
+            eat_chip_id,
+            exit_id,
+            "Chip".to_string(),
+        )));
+
+        assert_eq!(fsm.curr_state_id(), entry_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), eat_fish_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), eat_chip_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), eat_chip_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), exit_id);
+    }
+
+    #[test]
+    fn eat_fish_and_then_nap() {
+        let mut fsm = Fsm::new();
+        let entry_id = fsm.entry_state_id();
+        let exit_id = fsm.exit_state_id();
+        let eat_fish_id = fsm.add_state(Box::new(Eat::new("Fish".to_string(), 2)));
+        let nap_id = fsm.add_state(Box::new(Nap::new(2)));
+
+        fsm.add_transition(Box::new(Direct::new(entry_id, eat_fish_id)));
+        fsm.add_transition(Box::new(EatFinished::new(
+            eat_fish_id,
+            nap_id,
+            "Fish".to_string(),
+        )));
+        fsm.add_transition(Box::new(EatFinished::new(
+            eat_fish_id,
+            exit_id,
+            "Chip".to_string(),
+        )));
+        fsm.add_transition(Box::new(NapOnce::new(nap_id, exit_id)));
+
+        assert_eq!(fsm.curr_state_id(), entry_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), eat_fish_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), nap_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), exit_id);
+    }
+
+    #[test]
+    fn eat_and_nap_by_turn() {
+        let mut fsm = Fsm::new();
+        let entry_id = fsm.entry_state_id();
+        let exit_id = fsm.exit_state_id();
+        let eat_fish_id = fsm.add_state(Box::new(Eat::new("Fish".to_string(), 3)));
+        let nap_id = fsm.add_state(Box::new(Nap::new(2)));
+
+        fsm.add_transition(Box::new(Direct::new(entry_id, eat_fish_id)));
+        fsm.add_transition(Box::new(EatFinished::new(
+            eat_fish_id,
+            nap_id,
+            "Fish".to_string(),
+        )));
+        fsm.add_transition(Box::new(EatFinished::new(
+            eat_fish_id,
+            exit_id,
+            "Chip".to_string(),
+        )));
+        fsm.add_transition(Box::new(NapOnce::new(nap_id, eat_fish_id)));
+        fsm.add_transition(Box::new(NapFinished::new(nap_id, exit_id)));
+
+        assert_eq!(fsm.curr_state_id(), entry_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), eat_fish_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), eat_fish_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), nap_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), eat_fish_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), eat_fish_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), nap_id);
+        fsm.tick();
+        assert_eq!(fsm.curr_state_id(), exit_id);
+    }
+}
