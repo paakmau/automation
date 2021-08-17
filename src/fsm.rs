@@ -81,6 +81,10 @@ pub trait State: Deref<Target = Node> + DerefMut<Target = Node> + Any {
     fn as_any(&self) -> &dyn Any;
     fn enter(&mut self) {}
     fn tick(&mut self) {}
+    fn can_exit(&self) -> bool {
+        true
+    }
+    fn exit(&mut self) {}
 }
 
 pub struct Entry {
@@ -236,17 +240,22 @@ impl Fsm {
         }
         self.curr_state_mut().tick();
         let curr_state = self.curr_state();
-        for transition_id in &curr_state.out_set {
-            let transition = &self.transition_map[transition_id];
-            if transition.satisfied(curr_state) {
-                self.curr_state_id = transition.dest_id;
-                let curr_state = self.state_map.get_mut(&self.curr_state_id).unwrap();
-                curr_state.enter();
+        if curr_state.can_exit() {
+            for transition_id in &curr_state.out_set {
+                let transition = &self.transition_map[transition_id];
+                if transition.satisfied(curr_state) {
+                    let next_state_id = transition.dest_id;
+                    let curr_state = self.curr_state_mut();
+                    curr_state.exit();
+                    self.curr_state_id = next_state_id;
+                    let curr_state = self.state_map.get_mut(&self.curr_state_id).unwrap();
+                    curr_state.enter();
 
-                if self.curr_state_id == self.exit_state_id {
-                    self.exited = true;
+                    if self.curr_state_id == self.exit_state_id {
+                        self.exited = true;
+                    }
+                    break;
                 }
-                break;
             }
         }
     }
