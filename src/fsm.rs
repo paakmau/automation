@@ -263,6 +263,8 @@ impl Fsm {
 
 #[cfg(test)]
 mod tests {
+    use std::cmp::max;
+
     use super::*;
 
     struct Eat {
@@ -298,10 +300,16 @@ mod tests {
         }
         fn enter(&mut self) {
             self.food_count = self.food_sum;
-            self.food_count -= 1;
+            // Eat one immediately while entering
+            self.food_count = max(0, self.food_count - 1);
         }
         fn tick(&mut self) {
-            self.food_count -= 1;
+            // Eat one per tick
+            self.food_count = max(0, self.food_count - 1);
+        }
+        fn can_exit(&self) -> bool {
+            // Eat should not be exited until finishing eating
+            self.food_count == 0
         }
     }
 
@@ -358,7 +366,8 @@ mod tests {
     impl Transition for EatFinished {
         fn satisfied(&self, state: &dyn State) -> bool {
             if let Some(state) = state.as_any().downcast_ref::<Eat>() {
-                return state.food_count == 0 && state.food == self.food;
+                // We don't need to check state.food_count here because of the can_exit method
+                return state.food == self.food;
             }
             false
         }
