@@ -37,4 +37,8 @@ impl Simulator {
             })
             .expect("Failed to simulate mouse click");
     }
+
+    pub fn mouse_scroll(&mut self, dx: i32, dy: i32) {
+        self.context.mouse_scroll(dx, dy).expect("Failed to simulate mouse scrolling");
+    }
 }
