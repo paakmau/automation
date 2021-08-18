@@ -1,8 +1,6 @@
-use std::any::Any;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::ops::Deref;
-use std::ops::DerefMut;
+use std::marker::PhantomData;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct StateId(u32);
@@ -10,53 +8,25 @@ pub struct StateId(u32);
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct TransitionId(u32);
 
-pub struct Edge {
-    src_id: StateId,
-    dest_id: StateId,
+pub trait State {
+    fn enter(&mut self);
+    fn tick(&mut self);
+    fn can_exit(&self) -> bool;
+    fn exit(&mut self);
 }
 
-impl Edge {
-    pub fn new(src_id: StateId, dest_id: StateId) -> Edge {
-        Edge { src_id, dest_id }
-    }
-}
-
-pub trait Transition: Deref<Target = Edge> {
-    fn satisfied(&self, state: &dyn State) -> bool;
-}
-
-pub struct Direct {
-    edge: Edge,
-}
-impl Direct {
-    pub fn new(src_id: StateId, dest_id: StateId) -> Direct {
-        Direct {
-            edge: Edge::new(src_id, dest_id),
-        }
-    }
-}
-impl Deref for Direct {
-    type Target = Edge;
-    fn deref(&self) -> &Self::Target {
-        &self.edge
-    }
-}
-impl Transition for Direct {
-    fn satisfied(&self, _: &dyn State) -> bool {
-        true
-    }
-}
-
-pub struct Node {
+pub struct Node<S: State> {
     in_set: HashSet<TransitionId>,
     out_set: HashSet<TransitionId>,
+    state: S,
 }
 
-impl Node {
-    pub fn new() -> Node {
+impl<S: State> Node<S> {
+    pub fn new(state: S) -> Node<S> {
         Node {
             in_set: HashSet::new(),
             out_set: HashSet::new(),
+            state,
         }
     }
 
@@ -77,69 +47,39 @@ impl Node {
     }
 }
 
-pub trait State: Deref<Target = Node> + DerefMut<Target = Node> + Any {
-    fn as_any(&self) -> &dyn Any;
-    fn enter(&mut self) {}
-    fn tick(&mut self) {}
-    fn can_exit(&self) -> bool {
-        true
-    }
-    fn exit(&mut self) {}
+pub trait Transition<S: State> {
+    fn satisfied(&self, src: &S, dst: &S) -> bool;
 }
 
-pub struct Entry {
-    node: Node,
+pub struct Edge<S, T>
+where
+    S: State,
+    T: Transition<S>,
+{
+    _state_type: PhantomData<S>,
+    src_id: StateId,
+    dst_id: StateId,
+    transition: T,
 }
-impl Entry {
-    fn new() -> Entry {
-        Entry { node: Node::new() }
-    }
-}
-impl Deref for Entry {
-    type Target = Node;
-    fn deref(&self) -> &Self::Target {
-        &self.node
-    }
-}
-impl DerefMut for Entry {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.node
-    }
-}
-impl State for Entry {
-    fn as_any(&self) -> &dyn Any {
-        self
+
+impl<S, T> Edge<S, T>
+where
+    S: State,
+    T: Transition<S>,
+{
+    pub fn new(src_id: StateId, dst_id: StateId, transition: T) -> Edge<S, T> {
+        Edge {
+            _state_type: PhantomData,
+            src_id,
+            dst_id,
+            transition,
+        }
     }
 }
 
-pub struct Exit {
-    node: Node,
-}
-impl Exit {
-    fn new() -> Exit {
-        Exit { node: Node::new() }
-    }
-}
-impl Deref for Exit {
-    type Target = Node;
-    fn deref(&self) -> &Self::Target {
-        &self.node
-    }
-}
-impl DerefMut for Exit {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.node
-    }
-}
-impl State for Exit {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-pub struct Fsm {
-    state_map: HashMap<StateId, Box<dyn State>>,
-    transition_map: HashMap<TransitionId, Box<dyn Transition>>,
+pub struct Fsm<S: State, T: Transition<S>> {
+    node_map: HashMap<StateId, Node<S>>,
+    edge_map: HashMap<TransitionId, Edge<S, T>>,
 
     entry_state_id: StateId,
     exit_state_id: StateId,
@@ -151,11 +91,11 @@ pub struct Fsm {
     transition_id_counter: TransitionId,
 }
 
-impl Fsm {
-    pub fn new() -> Fsm {
+impl<S: State, T: Transition<S>> Fsm<S, T> {
+    pub fn new(entry_state: S, exit_state: S) -> Fsm<S, T> {
         let mut fsm = Fsm {
-            state_map: HashMap::new(),
-            transition_map: HashMap::new(),
+            node_map: HashMap::new(),
+            edge_map: HashMap::new(),
             entry_state_id: StateId(0),
             exit_state_id: StateId(0),
             exited: false,
@@ -163,8 +103,8 @@ impl Fsm {
             state_id_counter: StateId(0),
             transition_id_counter: TransitionId(0),
         };
-        fsm.entry_state_id = fsm.add_state(Box::new(Entry::new()));
-        fsm.exit_state_id = fsm.add_state(Box::new(Exit::new()));
+        fsm.entry_state_id = fsm.add_state(entry_state);
+        fsm.exit_state_id = fsm.add_state(exit_state);
         fsm.curr_state_id = fsm.entry_state_id;
         fsm
     }
@@ -178,59 +118,74 @@ impl Fsm {
     pub fn curr_state_id(&self) -> StateId {
         self.curr_state_id
     }
-    pub fn curr_state(&self) -> &dyn State {
-        self.state_map[&self.curr_state_id].as_ref()
+    pub fn curr_state(&self) -> &S {
+        &self.curr_node().state
     }
-    pub fn curr_state_mut(&mut self) -> &mut dyn State {
-        self.state_map
-            .get_mut(&self.curr_state_id)
-            .unwrap()
-            .as_mut()
+    pub fn curr_state_mut(&mut self) -> &mut S {
+        &mut self.curr_node_mut().state
     }
 
-    pub fn add_state(&mut self, state: Box<dyn State>) -> StateId {
+    fn curr_node(&self) -> &Node<S> {
+        self.node_map.get(&self.curr_state_id).unwrap()
+    }
+    fn curr_node_mut(&mut self) -> &mut Node<S> {
+        self.node_map.get_mut(&self.curr_state_id).unwrap()
+    }
+
+    pub fn add_state(&mut self, state: S) -> StateId {
         self.state_id_counter.0 += 1;
-        self.state_map.insert(self.state_id_counter, state);
+        self.node_map
+            .insert(self.state_id_counter, Node::new(state));
         self.state_id_counter
     }
 
     pub fn remove_state(&mut self, id: StateId) {
-        if let Some(state) = self.state_map.remove(&id) {
-            for id in &state.in_set {
-                self.transition_map.remove(id);
+        if let Some(Node {
+            in_set,
+            out_set,
+            state: _,
+        }) = self.node_map.remove(&id)
+        {
+            for id in &in_set {
+                self.edge_map.remove(id);
             }
-            for id in &state.out_set {
-                self.transition_map.remove(id);
+            for id in &out_set {
+                self.edge_map.remove(id);
             }
         }
     }
 
-    pub fn add_transition(&mut self, transition: Box<dyn Transition>) -> Option<TransitionId> {
-        if self.state_map.contains_key(&transition.src_id)
-            && self.state_map.contains_key(&transition.dest_id)
-        {
+    pub fn add_transition(
+        &mut self,
+        src_id: StateId,
+        dst_id: StateId,
+        transition: T,
+    ) -> Option<TransitionId> {
+        if self.node_map.contains_key(&src_id) && self.node_map.contains_key(&dst_id) {
             self.transition_id_counter.0 += 1;
 
-            let src_state = self.state_map.get_mut(&transition.src_id).unwrap();
-            src_state.add_out(self.transition_id_counter);
+            let src_node = self.node_map.get_mut(&src_id).unwrap();
+            src_node.add_out(self.transition_id_counter);
 
-            let dest_state = self.state_map.get_mut(&transition.dest_id).unwrap();
-            dest_state.add_in(self.transition_id_counter);
+            let dst_node = self.node_map.get_mut(&dst_id).unwrap();
+            dst_node.add_in(self.transition_id_counter);
 
-            self.transition_map
-                .insert(self.transition_id_counter, transition);
+            self.edge_map.insert(
+                self.transition_id_counter,
+                Edge::new(src_id, dst_id, transition),
+            );
             return Some(self.transition_id_counter);
         }
         None
     }
 
     pub fn remove_transition(&mut self, id: TransitionId) {
-        if let Some(transition) = self.transition_map.remove(&id) {
-            let src_state = self.state_map.get_mut(&transition.src_id).unwrap();
-            src_state.remove_out(id);
+        if let Some(edge) = self.edge_map.remove(&id) {
+            let src_node = self.node_map.get_mut(&edge.src_id).unwrap();
+            src_node.remove_out(id);
 
-            let dest_state = self.state_map.get_mut(&transition.dest_id).unwrap();
-            dest_state.remove_in(id);
+            let dst_state = self.node_map.get_mut(&edge.dst_id).unwrap();
+            dst_state.remove_in(id);
         }
     }
 
@@ -239,16 +194,17 @@ impl Fsm {
             return;
         }
         self.curr_state_mut().tick();
-        let curr_state = self.curr_state();
-        if curr_state.can_exit() {
-            for transition_id in &curr_state.out_set {
-                let transition = &self.transition_map[transition_id];
-                if transition.satisfied(curr_state) {
-                    let next_state_id = transition.dest_id;
+        let curr_node = self.curr_node();
+        if curr_node.state.can_exit() {
+            for transition_id in &curr_node.out_set {
+                let edge = &self.edge_map[transition_id];
+                let dst_state = &self.node_map[&edge.dst_id].state;
+                if edge.transition.satisfied(&curr_node.state, dst_state) {
+                    let next_state_id = edge.dst_id;
                     let curr_state = self.curr_state_mut();
                     curr_state.exit();
                     self.curr_state_id = next_state_id;
-                    let curr_state = self.state_map.get_mut(&self.curr_state_id).unwrap();
+                    let curr_state = self.curr_state_mut();
                     curr_state.enter();
 
                     if self.curr_state_id == self.exit_state_id {
@@ -263,172 +219,130 @@ impl Fsm {
 
 #[cfg(test)]
 mod tests {
-    use std::cmp::max;
-
     use super::*;
 
-    struct Eat {
-        node: Node,
-        food: String,
-        food_sum: u32,
-        food_count: u32,
+    enum ActionState {
+        Eat {
+            food: String,
+            food_sum: u32,
+            food_count: u32,
+        },
+        Nap {
+            tick_time: u32,
+        },
+        Entry,
+        Exit,
     }
-    impl Eat {
-        fn new(food: String, food_sum: u32) -> Eat {
-            Eat {
-                node: Node::new(),
-                food,
-                food_sum,
-                food_count: food_sum,
-            }
-        }
-    }
-    impl Deref for Eat {
-        type Target = Node;
-        fn deref(&self) -> &Self::Target {
-            &self.node
-        }
-    }
-    impl DerefMut for Eat {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.node
-        }
-    }
-    impl State for Eat {
-        fn as_any(&self) -> &dyn Any {
-            self
-        }
+
+    impl State for ActionState {
         fn enter(&mut self) {
-            self.food_count = self.food_sum;
-            // Eat one immediately while entering
-            self.food_count = max(0, self.food_count - 1);
+            match self {
+                ActionState::Eat {
+                    food: _,
+                    food_sum,
+                    food_count,
+                } => {
+                    // Eat one immediately while entering
+                    if *food_sum > 0 {
+                        *food_count = *food_sum - 1;
+                    } else {
+                        *food_count = 0;
+                    }
+                }
+                _ => {}
+            }
         }
+
         fn tick(&mut self) {
-            // Eat one per tick
-            self.food_count = max(0, self.food_count - 1);
+            match self {
+                ActionState::Eat {
+                    food: _,
+                    food_sum: _,
+                    food_count,
+                } => {
+                    // Eat one per tick
+                    if *food_count > 0 {
+                        *food_count = *food_count - 1;
+                    } else {
+                        *food_count = 0;
+                    }
+                }
+
+                ActionState::Nap { tick_time } => {
+                    if *tick_time > 0 {
+                        *tick_time = *tick_time - 1;
+                    } else {
+                        *tick_time = 0;
+                    }
+                }
+                _ => {}
+            }
         }
+
         fn can_exit(&self) -> bool {
-            // Eat should not be exited until finishing eating
-            self.food_count == 0
+            match self {
+                ActionState::Eat {
+                    food: _,
+                    food_sum: _,
+                    food_count,
+                } => {
+                    // Eat should not be exited until finishing eating
+                    *food_count == 0
+                }
+                _ => true,
+            }
         }
+
+        fn exit(&mut self) {}
     }
 
-    struct Nap {
-        node: Node,
-        tick_count: u32,
-    }
-    impl Nap {
-        fn new(tick_count: u32) -> Nap {
-            Nap {
-                node: Node::new(),
-                tick_count,
-            }
-        }
-    }
-    impl Deref for Nap {
-        type Target = Node;
-        fn deref(&self) -> &Self::Target {
-            &self.node
-        }
-    }
-    impl DerefMut for Nap {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.node
-        }
-    }
-    impl State for Nap {
-        fn as_any(&self) -> &dyn Any {
-            self
-        }
-        fn tick(&mut self) {
-            self.tick_count -= 1;
-        }
+    enum ActionTransition {
+        Direct,
+        EatFinished { food: String },
+        NapOnce,
+        NapFinished,
     }
 
-    struct EatFinished {
-        edge: Edge,
-        food: String,
-    }
-    impl EatFinished {
-        fn new(src_id: StateId, dest_id: StateId, food: String) -> EatFinished {
-            EatFinished {
-                edge: Edge::new(src_id, dest_id),
-                food,
-            }
-        }
-    }
-    impl Deref for EatFinished {
-        type Target = Edge;
-        fn deref(&self) -> &Self::Target {
-            &self.edge
-        }
-    }
-    impl Transition for EatFinished {
-        fn satisfied(&self, state: &dyn State) -> bool {
-            if let Some(state) = state.as_any().downcast_ref::<Eat>() {
-                // We don't need to check state.food_count here because of the can_exit method
-                return state.food == self.food;
-            }
-            false
-        }
-    }
+    impl Transition<ActionState> for ActionTransition {
+        fn satisfied(&self, src: &ActionState, _dst: &ActionState) -> bool {
+            match self {
+                ActionTransition::Direct => true,
 
-    struct NapOnce {
-        edge: Edge,
-    }
-    impl NapOnce {
-        fn new(src_id: StateId, dest_id: StateId) -> NapOnce {
-            NapOnce {
-                edge: Edge::new(src_id, dest_id),
-            }
-        }
-    }
-    impl Deref for NapOnce {
-        type Target = Edge;
-        fn deref(&self) -> &Self::Target {
-            &self.edge
-        }
-    }
-    impl Transition for NapOnce {
-        fn satisfied(&self, state: &dyn State) -> bool {
-            if let Some(state) = state.as_any().downcast_ref::<Nap>() {
-                return state.tick_count > 0;
-            }
-            false
-        }
-    }
+                ActionTransition::EatFinished { food: state_food } => {
+                    if let ActionState::Eat {
+                        food: transition_food,
+                        food_sum: _,
+                        food_count: _,
+                    } = src
+                    {
+                        return *state_food == *transition_food;
+                    }
+                    false
+                }
 
-    struct NapFinished {
-        edge: Edge,
-    }
-    impl NapFinished {
-        fn new(src_id: StateId, dest_id: StateId) -> NapFinished {
-            NapFinished {
-                edge: Edge::new(src_id, dest_id),
+                ActionTransition::NapOnce => {
+                    if let ActionState::Nap { tick_time } = src {
+                        return *tick_time != 0;
+                    }
+                    false
+                }
+
+                ActionTransition::NapFinished => {
+                    if let ActionState::Nap { tick_time } = src {
+                        return *tick_time == 0;
+                    }
+                    false
+                }
             }
-        }
-    }
-    impl Deref for NapFinished {
-        type Target = Edge;
-        fn deref(&self) -> &Self::Target {
-            &self.edge
-        }
-    }
-    impl Transition for NapFinished {
-        fn satisfied(&self, state: &dyn State) -> bool {
-            if let Some(state) = state.as_any().downcast_ref::<Nap>() {
-                return state.tick_count == 0;
-            }
-            false
         }
     }
 
     #[test]
     fn exit_directly() {
-        let mut fsm = Fsm::new();
+        let mut fsm = Fsm::new(ActionState::Entry, ActionState::Exit);
         let entry_id = fsm.entry_state_id();
         let exit_id = fsm.exit_state_id();
-        fsm.add_transition(Box::new(Direct::new(entry_id, exit_id)));
+        fsm.add_transition(entry_id, exit_id, ActionTransition::Direct);
         assert_eq!(fsm.curr_state_id(), entry_id);
         fsm.tick();
         assert_eq!(fsm.curr_state_id(), exit_id);
@@ -437,29 +351,36 @@ mod tests {
     }
 
     #[test]
-    fn eat_fish_and_then_bread() {
-        let mut fsm = Fsm::new();
+    fn eat_fish_and_then_chip() {
+        let mut fsm = Fsm::new(ActionState::Entry, ActionState::Exit);
         let entry_id = fsm.entry_state_id();
         let exit_id = fsm.exit_state_id();
-        let eat_fish_id = fsm.add_state(Box::new(Eat::new("Fish".to_string(), 2)));
-        let eat_chip_id = fsm.add_state(Box::new(Eat::new("Chip".to_string(), 3)));
+        let eat_fish_id = fsm.add_state(ActionState::Eat {
+            food: "Fish".to_string(),
+            food_sum: 2,
+            food_count: 2,
+        });
+        let eat_chip_id = fsm.add_state(ActionState::Eat {
+            food: "Chip".to_string(),
+            food_sum: 3,
+            food_count: 3,
+        });
 
-        fsm.add_transition(Box::new(Direct::new(entry_id, eat_fish_id)));
-        fsm.add_transition(Box::new(EatFinished::new(
+        fsm.add_transition(entry_id, eat_fish_id, ActionTransition::Direct);
+        fsm.add_transition(
             eat_fish_id,
             eat_chip_id,
-            "Fish".to_string(),
-        )));
-        fsm.add_transition(Box::new(EatFinished::new(
-            eat_fish_id,
-            exit_id,
-            "Chip".to_string(),
-        )));
-        fsm.add_transition(Box::new(EatFinished::new(
+            ActionTransition::EatFinished {
+                food: "Fish".to_string(),
+            },
+        );
+        fsm.add_transition(
             eat_chip_id,
             exit_id,
-            "Chip".to_string(),
-        )));
+            ActionTransition::EatFinished {
+                food: "Chip".to_string(),
+            },
+        );
 
         assert_eq!(fsm.curr_state_id(), entry_id);
         fsm.tick();
@@ -474,24 +395,25 @@ mod tests {
 
     #[test]
     fn eat_fish_and_then_nap() {
-        let mut fsm = Fsm::new();
+        let mut fsm = Fsm::new(ActionState::Entry, ActionState::Exit);
         let entry_id = fsm.entry_state_id();
         let exit_id = fsm.exit_state_id();
-        let eat_fish_id = fsm.add_state(Box::new(Eat::new("Fish".to_string(), 2)));
-        let nap_id = fsm.add_state(Box::new(Nap::new(2)));
+        let eat_fish_id = fsm.add_state(ActionState::Eat {
+            food: "Fish".to_string(),
+            food_sum: 2,
+            food_count: 2,
+        });
+        let nap_id = fsm.add_state(ActionState::Nap { tick_time: 2 });
 
-        fsm.add_transition(Box::new(Direct::new(entry_id, eat_fish_id)));
-        fsm.add_transition(Box::new(EatFinished::new(
+        fsm.add_transition(entry_id, eat_fish_id, ActionTransition::Direct);
+        fsm.add_transition(
             eat_fish_id,
             nap_id,
-            "Fish".to_string(),
-        )));
-        fsm.add_transition(Box::new(EatFinished::new(
-            eat_fish_id,
-            exit_id,
-            "Chip".to_string(),
-        )));
-        fsm.add_transition(Box::new(NapOnce::new(nap_id, exit_id)));
+            ActionTransition::EatFinished {
+                food: "Fish".to_string(),
+            },
+        );
+        fsm.add_transition(nap_id, exit_id, ActionTransition::NapOnce);
 
         assert_eq!(fsm.curr_state_id(), entry_id);
         fsm.tick();
@@ -504,25 +426,26 @@ mod tests {
 
     #[test]
     fn eat_and_nap_by_turn() {
-        let mut fsm = Fsm::new();
+        let mut fsm = Fsm::new(ActionState::Entry, ActionState::Exit);
         let entry_id = fsm.entry_state_id();
         let exit_id = fsm.exit_state_id();
-        let eat_fish_id = fsm.add_state(Box::new(Eat::new("Fish".to_string(), 3)));
-        let nap_id = fsm.add_state(Box::new(Nap::new(2)));
+        let eat_fish_id = fsm.add_state(ActionState::Eat {
+            food: "Fish".to_string(),
+            food_sum: 3,
+            food_count: 3,
+        });
+        let nap_id = fsm.add_state(ActionState::Nap { tick_time: 2 });
 
-        fsm.add_transition(Box::new(Direct::new(entry_id, eat_fish_id)));
-        fsm.add_transition(Box::new(EatFinished::new(
+        fsm.add_transition(entry_id, eat_fish_id, ActionTransition::Direct);
+        fsm.add_transition(
             eat_fish_id,
             nap_id,
-            "Fish".to_string(),
-        )));
-        fsm.add_transition(Box::new(EatFinished::new(
-            eat_fish_id,
-            exit_id,
-            "Chip".to_string(),
-        )));
-        fsm.add_transition(Box::new(NapOnce::new(nap_id, eat_fish_id)));
-        fsm.add_transition(Box::new(NapFinished::new(nap_id, exit_id)));
+            ActionTransition::EatFinished {
+                food: "Fish".to_string(),
+            },
+        );
+        fsm.add_transition(nap_id, eat_fish_id, ActionTransition::NapOnce);
+        fsm.add_transition(nap_id, exit_id, ActionTransition::NapFinished);
 
         assert_eq!(fsm.curr_state_id(), entry_id);
         fsm.tick();
