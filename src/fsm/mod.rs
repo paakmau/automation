@@ -222,6 +222,8 @@ mod tests {
     struct Context;
 
     enum ActionState {
+        Entry,
+        Exit,
         Eat {
             food: String,
             food_sum: u32,
@@ -230,8 +232,6 @@ mod tests {
         Nap {
             tick_time: u32,
         },
-        Entry,
-        Exit,
     }
 
     impl State<Context> for ActionState {
