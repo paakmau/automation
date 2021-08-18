@@ -10,8 +10,7 @@ pub struct TransitionId(u32);
 
 pub trait State<C> {
     fn enter(&mut self, ctx: &mut C);
-    fn tick(&mut self, ctx: &mut C);
-    fn can_exit(&self, ctx: &C) -> bool;
+    fn tick(&mut self, ctx: &mut C) -> bool;
     fn exit(&mut self, ctx: &mut C);
 }
 
@@ -193,9 +192,8 @@ impl<C, S: State<C>, T: Transition<C, S>> Fsm<C, S, T> {
         if self.exited {
             return;
         }
-        self.curr_state_mut().tick(ctx);
-        let curr_node = self.curr_node();
-        if curr_node.state.can_exit(ctx) {
+        if self.curr_node_mut().state.tick(ctx) {
+            let curr_node = self.curr_node();
             for transition_id in &curr_node.out_set {
                 let edge = &self.edge_map[transition_id];
                 let dst_state = &self.node_map[&edge.dst_id].state;
@@ -255,7 +253,7 @@ mod tests {
             }
         }
 
-        fn tick(&mut self, _: &mut Context) {
+        fn tick(&mut self, _: &mut Context) -> bool {
             match self {
                 ActionState::Eat {
                     food: _,
@@ -268,6 +266,9 @@ mod tests {
                     } else {
                         *food_count = 0;
                     }
+
+                    // Eat should not be exited until finishing eating
+                    *food_count == 0
                 }
 
                 ActionState::Nap { tick_time } => {
@@ -276,20 +277,7 @@ mod tests {
                     } else {
                         *tick_time = 0;
                     }
-                }
-                _ => {}
-            }
-        }
-
-        fn can_exit(&self, _: &Context) -> bool {
-            match self {
-                ActionState::Eat {
-                    food: _,
-                    food_sum: _,
-                    food_count,
-                } => {
-                    // Eat should not be exited until finishing eating
-                    *food_count == 0
+                    true
                 }
                 _ => true,
             }
