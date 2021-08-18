@@ -2,6 +2,10 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::marker::PhantomData;
 
+mod preset;
+
+pub use preset::*;
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct StateId(u32);
 
