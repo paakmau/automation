@@ -235,7 +235,7 @@ mod tests {
     }
 
     impl State<Context> for ActionState {
-        fn enter(&mut self, _: &mut Context) {
+        fn enter(&mut self, _ctx: &mut Context) {
             match self {
                 ActionState::Eat {
                     food: _,
@@ -253,7 +253,7 @@ mod tests {
             }
         }
 
-        fn tick(&mut self, _: &mut Context) -> bool {
+        fn tick(&mut self, _ctx: &mut Context) -> bool {
             match self {
                 ActionState::Eat {
                     food: _,
@@ -283,7 +283,7 @@ mod tests {
             }
         }
 
-        fn exit(&mut self, _: &mut Context) {}
+        fn exit(&mut self, _ctx: &mut Context) {}
     }
 
     enum ActionTransition {
