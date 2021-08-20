@@ -1,6 +1,9 @@
 use std::io::ErrorKind::WouldBlock;
+use std::ops::Deref;
 use std::thread;
 use std::time::Duration;
+
+use bytes::{Buf, BufMut};
 
 use crate::Screenshot;
 
@@ -27,9 +30,8 @@ impl Capturer {
 
         loop {
             // Wait until there's a frame.
-
-            let buffer = match self.capturer.frame() {
-                Ok(buffer) => buffer,
+            let frame = match self.capturer.frame() {
+                Ok(frame) => frame,
                 Err(error) => {
                     if error.kind() == WouldBlock {
                         // Keep spinning.
@@ -41,14 +43,15 @@ impl Capturer {
                 }
             };
 
-            // Flip the ABGR image into a RGB image.
-            let mut flipped_bits = Vec::with_capacity(w * h * 3);
-            let stride = buffer.len() / h;
-            for y in 0..h {
-                for x in 0..w {
-                    let i = stride * y + 4 * x;
-                    flipped_bits.extend_from_slice(&[buffer[i + 2], buffer[i + 1], buffer[i]]);
-                }
+            let mut flipped_bits = Vec::<u8>::with_capacity(frame.len());
+
+            let s = w * h;
+            let mut bits = frame.deref();
+            for _ in 0..s {
+                let bgra = bits.get_u32();
+                let rgba =
+                    (bgra & 0x00FF00FF) | ((bgra & 0xFF000000) >> 16) | ((bgra & 0x0000FF00) << 16);
+                flipped_bits.put_u32(rgba);
             }
 
             return Screenshot::from_raw(w as u32, h as u32, flipped_bits).unwrap();

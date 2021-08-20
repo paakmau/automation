@@ -1,48 +1,48 @@
 use std::path::Path;
 
-use image::{Rgb, RgbImage};
+use image::{Rgba, RgbaImage};
 
 use crate::error::Result;
 
 #[derive(PartialEq)]
 pub struct Pixel<'a> {
-    rgb: &'a Rgb<u8>,
+    rgba: &'a Rgba<u8>,
 }
 
 impl<'a> Pixel<'a> {
-    pub fn new(rgb: &'a Rgb<u8>) -> Self {
-        Self { rgb }
+    pub fn new(rgba: &'a Rgba<u8>) -> Self {
+        Self { rgba }
     }
 
     pub fn r(&self) -> u8 {
-        self.rgb.0[0]
+        self.rgba.0[0]
     }
 
     pub fn g(&self) -> u8 {
-        self.rgb.0[1]
+        self.rgba.0[1]
     }
 
     pub fn b(&self) -> u8 {
-        self.rgb.0[2]
+        self.rgba.0[2]
     }
 
     pub fn luma(&self) -> u8 {
         const SRGB_LUMA: [u32; 3] = [2126, 7152, 722];
         let mut luma = 0u32;
         for i in 0..SRGB_LUMA.len() {
-            luma += self.rgb.0[i] as u32 * SRGB_LUMA[i];
+            luma += self.rgba.0[i] as u32 * SRGB_LUMA[i];
         }
         (luma / 10000u32) as u8
     }
 }
 
 pub struct Screenshot {
-    image: RgbImage,
+    image: RgbaImage,
 }
 
 impl Screenshot {
-    pub fn from_raw(width: u32, height: u32, rgb_data: Vec<u8>) -> Result<Self> {
-        match RgbImage::from_raw(width, height, rgb_data) {
+    pub fn from_raw(width: u32, height: u32, rgba_data: Vec<u8>) -> Result<Self> {
+        match RgbaImage::from_raw(width, height, rgba_data) {
             Some(image) => Ok(Screenshot { image }),
             None => Err("Data buffer not big enough".to_string()),
         }
@@ -53,8 +53,8 @@ impl Screenshot {
         T: AsRef<Path>,
     {
         match image::open(path) {
-            Ok(dynamic_img) => Ok(Screenshot {
-                image: dynamic_img.into_rgb8(),
+            Ok(dyn_img) => Ok(Screenshot {
+                image: dyn_img.into_rgba8(),
             }),
             _ => Err("Unknown error".to_string()),
         }

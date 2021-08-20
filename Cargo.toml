@@ -5,6 +5,7 @@ authors = ["Bomou He <paakmau@outlook.com>"]
 edition = "2018"
 
 [dependencies]
+bytes = "1.0.1"
 image = "0.23"
 scrap = "0.5"
 tfc = "0.6"
