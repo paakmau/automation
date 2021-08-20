@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use image::{Rgba, RgbaImage};
+use image::{ImageFormat, Rgba, RgbaImage};
 
 use crate::error::Result;
 
@@ -45,6 +45,15 @@ impl Screenshot {
         match RgbaImage::from_raw(width, height, rgba_data) {
             Some(image) => Ok(Screenshot { image }),
             None => Err("Data buffer not big enough".to_string()),
+        }
+    }
+
+    pub fn from_png_buf(buf: &[u8]) -> Result<Self> {
+        match image::load_from_memory_with_format(buf, ImageFormat::Png) {
+            Ok(dyn_img) => Ok(Screenshot {
+                image: dyn_img.into_rgba8(),
+            }),
+            _ => Err("Unknown error".to_string()),
         }
     }
 
