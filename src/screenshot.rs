@@ -36,6 +36,7 @@ impl<'a> Pixel<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct Screenshot {
     image: RgbaImage,
 }
