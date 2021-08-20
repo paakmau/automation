@@ -1,6 +1,6 @@
 use tfc::{Context, MouseContext};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum MouseButton {
     Left,
     Middle,
