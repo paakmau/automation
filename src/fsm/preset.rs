@@ -19,6 +19,7 @@ pub enum PresetState<'a> {
         dx: i32,
         dy: i32,
     },
+    Emtpy,
     Entry,
     Exit,
 }
