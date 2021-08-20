@@ -46,7 +46,7 @@ pub enum PresetTransition {
 }
 
 impl Transition<Context, PresetState> for PresetTransition {
-    fn satisfied(&self, _src: &PresetState, _dst: &PresetState) -> bool {
+    fn satisfied(&self, _ctx: &mut Context, _src: &PresetState, _dst: &PresetState) -> bool {
         true
     }
 }

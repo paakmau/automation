@@ -53,7 +53,7 @@ impl<C, S: State<C>> Node<C, S> {
 }
 
 pub trait Transition<C, S: State<C>> {
-    fn satisfied(&self, src: &S, dst: &S) -> bool;
+    fn satisfied(&self, ctx: &mut C, src: &S, dst: &S) -> bool;
 }
 
 pub struct Edge<C, S: State<C>, T: Transition<C, S>> {
@@ -201,7 +201,7 @@ impl<C, S: State<C>, T: Transition<C, S>> Fsm<C, S, T> {
             for transition_id in &curr_node.out_set {
                 let edge = &self.edge_map[transition_id];
                 let dst_state = &self.node_map[&edge.dst_id].state;
-                if edge.transition.satisfied(&curr_node.state, dst_state) {
+                if edge.transition.satisfied(ctx, &curr_node.state, dst_state) {
                     let next_state_id = edge.dst_id;
                     let curr_state = self.curr_state_mut();
                     curr_state.exit(ctx);
@@ -298,7 +298,7 @@ mod tests {
     }
 
     impl Transition<Context, ActionState> for ActionTransition {
-        fn satisfied(&self, src: &ActionState, _dst: &ActionState) -> bool {
+        fn satisfied(&self, _ctx: &mut Context, src: &ActionState, _dst: &ActionState) -> bool {
             match self {
                 ActionTransition::Direct => true,
 
