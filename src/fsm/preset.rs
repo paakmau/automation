@@ -4,15 +4,15 @@ use crate::context::MouseButton;
 use crate::Finder;
 use crate::Screenshot;
 
-pub enum PresetState {
+pub enum PresetState<'a> {
     MouseMoveTo {
-        pattern: Screenshot,
+        pattern: &'a Screenshot,
     },
     MouseClick {
         btn: MouseButton,
     },
     MouseClickAt {
-        pattern: Screenshot,
+        pattern: &'a Screenshot,
         btn: MouseButton,
     },
     MouseScroll {
@@ -23,7 +23,7 @@ pub enum PresetState {
     Exit,
 }
 
-impl State<Context> for PresetState {
+impl<'a> State<Context> for PresetState<'a> {
     fn enter(&mut self, ctx: &mut Context) {
         println!("Enter");
         match self {
@@ -64,12 +64,12 @@ impl State<Context> for PresetState {
     }
 }
 
-pub enum PresetTransition {
-    PatternFound { pattern: Screenshot },
+pub enum PresetTransition<'a> {
+    PatternFound { pattern: &'a Screenshot },
     Direct,
 }
 
-impl Transition<Context, PresetState> for PresetTransition {
+impl<'a> Transition<Context, PresetState<'a>> for PresetTransition<'a> {
     fn satisfied(&self, ctx: &mut Context, _src: &PresetState, _dst: &PresetState) -> bool {
         match self {
             PresetTransition::PatternFound { pattern } => {
