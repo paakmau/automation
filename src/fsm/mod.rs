@@ -88,6 +88,8 @@ pub struct Fsm<C, S: State<C>, T: Transition<C, S>> {
     exited: bool,
 
     curr_state_id: StateId,
+    curr_state_finished: bool,
+
     state_id_counter: StateId,
     transition_id_counter: TransitionId,
 }
@@ -102,6 +104,7 @@ impl<C, S: State<C>, T: Transition<C, S>> Fsm<C, S, T> {
             exit_state_id: StateId(0),
             exited: false,
             curr_state_id: StateId(0),
+            curr_state_finished: false,
             state_id_counter: StateId(0),
             transition_id_counter: TransitionId(0),
         };
@@ -196,7 +199,10 @@ impl<C, S: State<C>, T: Transition<C, S>> Fsm<C, S, T> {
         if self.exited {
             return;
         }
-        if self.curr_node_mut().state.tick(ctx) {
+        if !self.curr_state_finished {
+            self.curr_state_finished = self.curr_node_mut().state.tick(ctx);
+        }
+        if self.curr_state_finished {
             let curr_node = self.curr_node();
             for transition_id in &curr_node.out_set {
                 let edge = &self.edge_map[transition_id];
@@ -205,7 +211,9 @@ impl<C, S: State<C>, T: Transition<C, S>> Fsm<C, S, T> {
                     let next_state_id = edge.dst_id;
                     let curr_state = self.curr_state_mut();
                     curr_state.exit(ctx);
+
                     self.curr_state_id = next_state_id;
+                    self.curr_state_finished = false;
                     let curr_state = self.curr_state_mut();
                     curr_state.enter(ctx);
 
