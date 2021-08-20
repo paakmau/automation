@@ -3,8 +3,6 @@ use std::ops::Deref;
 use std::thread;
 use std::time::Duration;
 
-use bytes::{Buf, BufMut};
-
 use crate::Screenshot;
 
 pub struct Capturer {
@@ -42,19 +40,15 @@ impl Capturer {
                     }
                 }
             };
+            let bgra_buf = frame.deref();
 
-            let mut flipped_bits = Vec::<u8>::with_capacity(frame.len());
-
-            let s = w * h;
-            let mut bits = frame.deref();
-            for _ in 0..s {
-                let bgra = bits.get_u32();
-                let rgba =
-                    (bgra & 0x00FF00FF) | ((bgra & 0xFF000000) >> 16) | ((bgra & 0x0000FF00) << 16);
-                flipped_bits.put_u32(rgba);
+            let mut rgba_buf = vec![0u8; bgra_buf.len()];
+            for i in (0..bgra_buf.len()).step_by(4) {
+                let gbra = &bgra_buf[i..i + 4];
+                rgba_buf[i..i + 4].copy_from_slice(&[gbra[2], gbra[1], gbra[0], gbra[3]]);
             }
 
-            return Screenshot::from_raw(w as u32, h as u32, flipped_bits).unwrap();
+            return Screenshot::from_raw(w as u32, h as u32, rgba_buf).unwrap();
         }
     }
 }
