@@ -5,8 +5,20 @@ use crate::Finder;
 use crate::Screenshot;
 
 pub enum PresetState {
-    MouseMoveTo { pattern: Screenshot },
-    MouseClick { btn: MouseButton },
+    MouseMoveTo {
+        pattern: Screenshot,
+    },
+    MouseClick {
+        btn: MouseButton,
+    },
+    MouseClickAt {
+        pattern: Screenshot,
+        btn: MouseButton,
+    },
+    MouseScroll {
+        dx: i32,
+        dy: i32,
+    },
     Entry,
     Exit,
 }
@@ -16,6 +28,7 @@ impl State<Context> for PresetState {
         println!("Enter");
         match self {
             PresetState::MouseClick { btn } => ctx.simulator_mut().mouse_click(*btn),
+            PresetState::MouseScroll { dx, dy } => ctx.simulator_mut().mouse_scroll(*dx, *dy),
             _ => {}
         }
     }
@@ -32,6 +45,16 @@ impl State<Context> for PresetState {
                 }
                 false
             }
+            PresetState::MouseClickAt { pattern, btn } => {
+                let screenshot = ctx.capturer_mut().frame();
+                let finder = Finder::new(&screenshot);
+                if let Some(pos) = finder.find(pattern) {
+                    ctx.simulator_mut().mouse_move_to(pos.0, pos.1);
+                    ctx.simulator_mut().mouse_click(*btn);
+                    return true;
+                }
+                false
+            }
             _ => true,
         }
     }
@@ -42,11 +65,19 @@ impl State<Context> for PresetState {
 }
 
 pub enum PresetTransition {
+    PatternFound { pattern: Screenshot },
     Direct,
 }
 
 impl Transition<Context, PresetState> for PresetTransition {
-    fn satisfied(&self, _ctx: &mut Context, _src: &PresetState, _dst: &PresetState) -> bool {
-        true
+    fn satisfied(&self, ctx: &mut Context, _src: &PresetState, _dst: &PresetState) -> bool {
+        match self {
+            PresetTransition::PatternFound { pattern } => {
+                let screenshot = ctx.capturer_mut().frame();
+                let finder = Finder::new(&screenshot);
+                finder.find(pattern).is_some()
+            }
+            PresetTransition::Direct => true,
+        }
     }
 }
