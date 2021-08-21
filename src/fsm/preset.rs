@@ -26,7 +26,6 @@ pub enum PresetState<'a> {
 
 impl<'a> State<Context> for PresetState<'a> {
     fn enter(&mut self, ctx: &mut Context) {
-        println!("Enter");
         match self {
             PresetState::MouseClick { btn } => ctx.simulator_mut().mouse_click(*btn),
             PresetState::MouseScroll { dx, dy } => ctx.simulator_mut().mouse_scroll(*dx, *dy),
@@ -35,7 +34,6 @@ impl<'a> State<Context> for PresetState<'a> {
     }
 
     fn tick(&mut self, ctx: &mut Context) -> bool {
-        println!("Tick");
         match self {
             PresetState::MouseMoveTo { pattern } => {
                 let screenshot = ctx.capturer_mut().frame();
@@ -60,9 +58,7 @@ impl<'a> State<Context> for PresetState<'a> {
         }
     }
 
-    fn exit(&mut self, _ctx: &mut Context) {
-        println!("Exit");
-    }
+    fn exit(&mut self, _ctx: &mut Context) {}
 }
 
 pub enum PresetTransition<'a> {
