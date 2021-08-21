@@ -40,15 +40,8 @@ impl Capturer {
                     }
                 }
             };
-            let bgra_buf = frame.deref();
 
-            let mut rgba_buf = vec![0u8; bgra_buf.len()];
-            for i in (0..bgra_buf.len()).step_by(4) {
-                let gbra = &bgra_buf[i..i + 4];
-                rgba_buf[i..i + 4].copy_from_slice(&[gbra[2], gbra[1], gbra[0], gbra[3]]);
-            }
-
-            return Screenshot::from_raw(w as u32, h as u32, rgba_buf).unwrap();
+            return Screenshot::from_bgra_buf(w as u32, h as u32, frame.to_vec()).unwrap();
         }
     }
 }

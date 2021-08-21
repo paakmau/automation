@@ -1,59 +1,83 @@
 use std::path::Path;
 
-use image::{ImageFormat, Rgba, RgbaImage};
+use image::{GenericImageView, ImageFormat, RgbaImage};
 
 use crate::error::Result;
 
 #[derive(PartialEq)]
 pub struct Pixel<'a> {
-    rgba: &'a Rgba<u8>,
+    bgra: &'a [u8],
 }
 
 impl<'a> Pixel<'a> {
-    pub fn new(rgba: &'a Rgba<u8>) -> Self {
-        Self { rgba }
+    pub fn new(bgra: &'a [u8]) -> Self {
+        Self { bgra }
     }
 
     pub fn r(&self) -> u8 {
-        self.rgba.0[0]
+        self.bgra[2]
     }
 
     pub fn g(&self) -> u8 {
-        self.rgba.0[1]
+        self.bgra[1]
     }
 
     pub fn b(&self) -> u8 {
-        self.rgba.0[2]
+        self.bgra[0]
+    }
+
+    pub fn a(&self) -> u8 {
+        self.bgra[3]
     }
 
     pub fn luma(&self) -> u8 {
-        const SRGB_LUMA: [u32; 3] = [2126, 7152, 722];
+        const BGR_LUMA_FACTOR: [u32; 3] = [722, 7152, 2126];
+        const SCALE: u32 = 10000;
         let mut luma = 0u32;
-        for i in 0..SRGB_LUMA.len() {
-            luma += self.rgba.0[i] as u32 * SRGB_LUMA[i];
+        for i in 0..BGR_LUMA_FACTOR.len() {
+            luma += self.bgra[i] as u32 * BGR_LUMA_FACTOR[i];
         }
-        (luma / 10000u32) as u8
+        (luma / SCALE) as u8
     }
 }
 
 #[derive(Debug)]
 pub struct Screenshot {
-    image: RgbaImage,
+    width: u32,
+    height: u32,
+    bgra_buf: Vec<u8>,
 }
 
 impl Screenshot {
-    pub fn from_raw(width: u32, height: u32, rgba_data: Vec<u8>) -> Result<Self> {
-        match RgbaImage::from_raw(width, height, rgba_data) {
-            Some(image) => Ok(Screenshot { image }),
-            None => Err("Data buffer not big enough".to_string()),
+    pub fn from_bgra_buf(width: u32, height: u32, bgra_buf: Vec<u8>) -> Result<Self> {
+        if bgra_buf.len() as u32 != width * height * 4 {
+            return Err("Unknown error".to_string());
         }
+        Ok(Screenshot {
+            width,
+            height,
+            bgra_buf,
+        })
+    }
+
+    pub fn from_rgba_buf(width: u32, height: u32, mut buf: Vec<u8>) -> Result<Self> {
+        if buf.len() as u32 != width * height * 4 {
+            return Err("Unknown error".to_string());
+        }
+
+        Self::swap_chanel_r_and_b(&mut buf);
+
+        Ok(Self::from_bgra_buf(width, height, buf).unwrap())
     }
 
     pub fn from_png_buf(buf: &[u8]) -> Result<Self> {
         match image::load_from_memory_with_format(buf, ImageFormat::Png) {
-            Ok(dyn_img) => Ok(Screenshot {
-                image: dyn_img.into_rgba8(),
-            }),
+            Ok(dyn_img) => Ok(Screenshot::from_rgba_buf(
+                dyn_img.width(),
+                dyn_img.height(),
+                dyn_img.into_rgba8().into_raw(),
+            )
+            .unwrap()),
             _ => Err("Unknown error".to_string()),
         }
     }
@@ -63,32 +87,46 @@ impl Screenshot {
         T: AsRef<Path>,
     {
         match image::open(path) {
-            Ok(dyn_img) => Ok(Screenshot {
-                image: dyn_img.into_rgba8(),
-            }),
+            Ok(dyn_img) => Ok(Screenshot::from_bgra_buf(
+                dyn_img.width(),
+                dyn_img.height(),
+                dyn_img.into_rgba8().into_raw(),
+            )
+            .unwrap()),
             _ => Err("Unknown error".to_string()),
         }
+    }
+
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+
+    pub fn pixel(&self, x: u32, y: u32) -> Pixel {
+        let head = (y * self.width + x) * 4;
+        let head = head as usize;
+        Pixel::new(&self.bgra_buf[head..head + 4])
     }
 
     pub fn save<T>(&self, path: T) -> Result<()>
     where
         T: AsRef<Path>,
     {
-        match self.image.save(path) {
+        let mut buf = self.bgra_buf.clone();
+        Self::swap_chanel_r_and_b(&mut buf);
+        let img = RgbaImage::from_raw(self.width, self.height, buf).unwrap();
+        match img.save(path) {
             Ok(()) => Ok(()),
             _ => Err("Unknown error".to_string()),
         }
     }
 
-    pub fn width(&self) -> u32 {
-        self.image.width()
-    }
-
-    pub fn height(&self) -> u32 {
-        self.image.height()
-    }
-
-    pub fn pixel(&self, x: u32, y: u32) -> Pixel {
-        Pixel::new(&self.image.get_pixel(x, y))
+    fn swap_chanel_r_and_b(buf: &mut Vec<u8>) {
+        for i in (0..buf.len()).step_by(4) {
+            buf.swap(i, i + 2);
+        }
     }
 }
