@@ -1,5 +1,4 @@
 use std::io::ErrorKind::WouldBlock;
-use std::ops::Deref;
 use std::thread;
 use std::time::Duration;
 
