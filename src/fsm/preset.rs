@@ -1,18 +1,21 @@
 use super::{State, Transition};
 use crate::context::Context;
 use crate::context::MouseButton;
+use crate::Direction;
 use crate::Finder;
 use crate::Screenshot;
 
 pub enum PresetState<'a> {
     MouseMoveTo {
         pattern: &'a Screenshot,
+        dir: Direction,
     },
     MouseClick {
         btn: MouseButton,
     },
     MouseClickAt {
         pattern: &'a Screenshot,
+        dir: Direction,
         btn: MouseButton,
     },
     MouseScroll {
@@ -35,19 +38,19 @@ impl<'a> State<Context> for PresetState<'a> {
 
     fn tick(&mut self, ctx: &mut Context) -> bool {
         match self {
-            PresetState::MouseMoveTo { pattern } => {
+            PresetState::MouseMoveTo { pattern, dir } => {
                 let screenshot = ctx.capturer_mut().frame();
                 let finder = Finder::new(&screenshot);
-                if let Some(pos) = finder.find(pattern) {
+                if let Some(pos) = finder.find(pattern, *dir) {
                     ctx.simulator_mut().mouse_move_to(pos.0, pos.1);
                     return true;
                 }
                 false
             }
-            PresetState::MouseClickAt { pattern, btn } => {
+            PresetState::MouseClickAt { pattern, dir, btn } => {
                 let screenshot = ctx.capturer_mut().frame();
                 let finder = Finder::new(&screenshot);
-                if let Some(pos) = finder.find(pattern) {
+                if let Some(pos) = finder.find(pattern, *dir) {
                     ctx.simulator_mut().mouse_move_to(pos.0, pos.1);
                     ctx.simulator_mut().mouse_click(*btn);
                     return true;
@@ -62,17 +65,20 @@ impl<'a> State<Context> for PresetState<'a> {
 }
 
 pub enum PresetTransition<'a> {
-    PatternFound { pattern: &'a Screenshot },
+    PatternFound {
+        pattern: &'a Screenshot,
+        dir: Direction,
+    },
     Direct,
 }
 
 impl<'a> Transition<Context, PresetState<'a>> for PresetTransition<'a> {
     fn satisfied(&self, ctx: &mut Context, _src: &PresetState, _dst: &PresetState) -> bool {
         match self {
-            PresetTransition::PatternFound { pattern } => {
+            PresetTransition::PatternFound { pattern, dir } => {
                 let screenshot = ctx.capturer_mut().frame();
                 let finder = Finder::new(&screenshot);
-                finder.find(pattern).is_some()
+                finder.find(pattern, *dir).is_some()
             }
             PresetTransition::Direct => true,
         }
