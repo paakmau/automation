@@ -1,9 +1,9 @@
 use super::{State, Transition};
 use crate::context::Context;
 use crate::context::MouseButton;
-use crate::Direction;
-use crate::Finder;
-use crate::Screenshot;
+use crate::image::Direction;
+use crate::image::Finder;
+use crate::image::Screenshot;
 
 pub enum PresetState<'a> {
     MouseMoveTo {

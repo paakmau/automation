@@ -2,7 +2,7 @@ use std::io::ErrorKind::WouldBlock;
 use std::thread;
 use std::time::Duration;
 
-use crate::Screenshot;
+use crate::image::Screenshot;
 
 pub struct Capturer {
     capturer: scrap::Capturer,

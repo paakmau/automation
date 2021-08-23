@@ -1,4 +1,4 @@
-use crate::Screenshot;
+use super::Screenshot;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Direction {
