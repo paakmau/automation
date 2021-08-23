@@ -3,18 +3,18 @@ use crate::context::Context;
 use crate::context::MouseButton;
 use crate::image::Direction;
 use crate::image::Finder;
-use crate::image::Screenshot;
+use crate::image::Pattern;
 
 pub enum PresetState<'a> {
     MouseMoveTo {
-        pattern: &'a Screenshot,
+        pattern: &'a Pattern,
         dir: Direction,
     },
     MouseClick {
         btn: MouseButton,
     },
     MouseClickAt {
-        pattern: &'a Screenshot,
+        pattern: &'a Pattern,
         dir: Direction,
         btn: MouseButton,
     },
@@ -66,7 +66,7 @@ impl<'a> State<Context> for PresetState<'a> {
 
 pub enum PresetTransition<'a> {
     PatternFound {
-        pattern: &'a Screenshot,
+        pattern: &'a Pattern,
         dir: Direction,
     },
     Direct,

@@ -1,4 +1,8 @@
-use super::Screenshot;
+use std::path::Path;
+
+use crate::Result;
+
+use super::{gray_image::GrayImage, CompressedGrayImage, FlattenArray, Pattern, Screenshot};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Direction {
@@ -42,74 +46,75 @@ impl Iterator for StepRange {
 }
 
 struct LumaMatrix {
-    sums: Vec<Vec<u64>>,
     width: u32,
     height: u32,
+    square_sums: FlattenArray<u64>,
 }
 
 impl LumaMatrix {
-    fn new(screenshot: &Screenshot) -> LumaMatrix {
-        let mut sums =
-            vec![vec![0u64; 1 + screenshot.width() as usize]; 1 + screenshot.height() as usize];
+    fn new(image: &CompressedGrayImage) -> LumaMatrix {
+        let mut square_sums = FlattenArray::new(
+            1 + image.width() as usize,
+            1 + image.height() as usize,
+            0u64,
+        );
 
-        let luma = |y, x| screenshot.pixel(x, y).luma() as u64;
-
-        let width = screenshot.width();
-        let height = screenshot.height();
+        let width = image.width();
+        let height = image.height();
         for y in 0..height as usize {
             for x in 0..width as usize {
-                sums[y + 1][x + 1] =
-                    sums[y][x + 1] + sums[y + 1][x] - sums[y][x] + luma(y as u32, x as u32);
+                let luma = image.pixel(x as u32, y as u32) as u64;
+                square_sums[(y + 1, x + 1)] = square_sums[(y, x + 1)] - square_sums[(y, x)]
+                    + square_sums[(y + 1, x)]
+                    + luma * luma;
             }
         }
 
         LumaMatrix {
-            sums,
             width,
             height,
+            square_sums,
         }
     }
 
-    fn luma_sum(&self) -> u64 {
-        self.sums[self.height as usize][self.width as usize]
-    }
-
-    fn partial_luma_sum(&self, [y, x, yy, xx]: [u32; 4]) -> u64 {
-        let [y, x, yy, xx] = [y as usize, x as usize, yy as usize, xx as usize];
-        self.sums[yy][xx] + self.sums[y][x] - self.sums[yy][x] - self.sums[y][xx]
+    #[inline]
+    fn square_sum_partial(&self, [y, x, yy, xx]: [u32; 4]) -> u64 {
+        let (y, x, yy, xx) = (y as usize, x as usize, yy as usize, xx as usize);
+        self.square_sums[(yy, xx)] - self.square_sums[(yy, x)] + self.square_sums[(y, x)]
+            - self.square_sums[(y, xx)]
     }
 }
 
 pub struct Finder<'a> {
     screenshot: &'a Screenshot,
-    luma_matrix: LumaMatrix,
 }
 
 impl<'a> Finder<'a> {
     pub fn new(screenshot: &'a Screenshot) -> Self {
-        Self {
-            screenshot,
-            luma_matrix: LumaMatrix::new(screenshot),
-        }
+        Self { screenshot }
     }
 
-    pub fn find(&self, pattern: &Screenshot, dir: Direction) -> Option<(u32, u32)> {
-        let pattern_hash = LumaMatrix::new(pattern).luma_sum();
-        let screenshot = self.screenshot;
+    pub fn find(&self, pattern: &Pattern, dir: Direction) -> Option<(u32, u32)> {
+        const THRESHOLD: f32 = 0.98;
 
-        let mut y_range = StepRange(0, (screenshot.height() - pattern.height() + 1) as i32, 1);
-        let mut x_range = StepRange(0, (screenshot.width() - pattern.width() + 1) as i32, 1);
+        let image =
+            GrayImage::from_screenshot(self.screenshot).into_compressed(Some(pattern.factor()));
+        let matrix = LumaMatrix::new(&image);
+
+        let mut max_score = 0f32;
+        let mut result = None;
+
+        let mut y_range = StepRange(0, (matrix.height - pattern.height() + 1) as i32, 1);
+        let mut x_range = StepRange(0, (matrix.width - pattern.width() + 1) as i32, 1);
+
         match dir {
             Direction::RightDown => {}
-
             Direction::RightUp => {
                 y_range = y_range.into_rev();
             }
-
             Direction::LeftDown => {
                 x_range = x_range.into_rev();
             }
-
             Direction::LeftUp => {
                 y_range = y_range.into_rev();
                 x_range = x_range.into_rev();
@@ -117,31 +122,43 @@ impl<'a> Finder<'a> {
         };
 
         for y in y_range {
-            'x: for x in x_range.clone() {
-                let y = y as u32;
-                let x = x as u32;
-                // First check luma sum
-                let partial_hash = self.luma_matrix.partial_luma_sum([
-                    y,
-                    x,
-                    y + pattern.height(),
-                    x + pattern.width(),
-                ]);
-                if partial_hash != pattern_hash {
-                    continue;
-                }
+            for x in x_range.clone() {
+                let (y, x) = (y as u32, x as u32);
 
-                for yy in 0..pattern.height() {
-                    for xx in 0..pattern.width() {
-                        if screenshot.pixel(x + xx, y + yy) != pattern.pixel(xx, yy) {
-                            continue 'x;
-                        }
+                let mut score = 0f32;
+                for dy in 0..pattern.height() {
+                    for dx in 0..pattern.width() {
+                        let image_value = image.pixel(x + dx, y + dy) as f32;
+                        let pattern_value = pattern.pixel(dx, dy) as f32;
+
+                        score += image_value * pattern_value;
                     }
                 }
 
-                return Some((x + (pattern.width() >> 1), y + (pattern.height() >> 1)));
+                let norm =
+                    ((matrix.square_sum_partial([y, x, y + pattern.height(), x + pattern.width()])
+                        * pattern.square_sum()) as f32)
+                        .sqrt();
+
+                score /= norm;
+
+                if score >= THRESHOLD && score > max_score {
+                    max_score = score;
+                    result = Some((
+                        x + (pattern.width() >> 1) << pattern.factor(),
+                        y + (pattern.height() >> 1) << pattern.factor(),
+                    ));
+                }
             }
         }
-        None
+
+        result
+    }
+
+    pub fn save<T>(&self, path: T) -> Result<()>
+    where
+        T: AsRef<Path>,
+    {
+        self.screenshot.save(path)
     }
 }

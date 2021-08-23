@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use image::{GenericImageView, ImageFormat, RgbaImage};
+use image::{GenericImageView, RgbaImage};
 
 use crate::error::Result;
 
@@ -58,28 +58,6 @@ impl Screenshot {
             height,
             bgra_buf,
         })
-    }
-
-    pub fn from_rgba_buf(width: u32, height: u32, mut buf: Vec<u8>) -> Result<Self> {
-        if buf.len() as u32 != width * height * 4 {
-            return Err("Unknown error".to_string());
-        }
-
-        Self::swap_chanel_r_and_b(&mut buf);
-
-        Ok(Self::from_bgra_buf(width, height, buf).unwrap())
-    }
-
-    pub fn from_png_buf(buf: &[u8]) -> Result<Self> {
-        match image::load_from_memory_with_format(buf, ImageFormat::Png) {
-            Ok(dyn_img) => Ok(Screenshot::from_rgba_buf(
-                dyn_img.width(),
-                dyn_img.height(),
-                dyn_img.into_rgba8().into_raw(),
-            )
-            .unwrap()),
-            _ => Err("Unknown error".to_string()),
-        }
     }
 
     pub fn from_file<T>(path: T) -> Result<Self>
