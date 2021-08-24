@@ -121,6 +121,11 @@ impl CompressedGrayImage {
     }
 
     #[inline]
+    pub fn pixels(&self, x: u32, y: u32, len: u32) -> &[u8] {
+        self.buf.values(y as usize, x as usize, len as usize)
+    }
+
+    #[inline]
     pub fn save<T>(&self, path: T) -> Result<()>
     where
         T: AsRef<Path>,

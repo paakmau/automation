@@ -126,12 +126,30 @@ impl<'a> Finder<'a> {
                 let (y, x) = (y as u32, x as u32);
 
                 let mut score = 0f32;
+                const LEN: u32 = 8u32;
                 for dy in 0..pattern.height() {
-                    for dx in 0..pattern.width() {
-                        let image_value = image.pixel(x + dx, y + dy) as f32;
-                        let pattern_value = pattern.pixel(dx, dy) as f32;
+                    for dx in (0..pattern.width()).step_by(LEN as usize) {
+                        use wide::u16x8;
 
-                        score += image_value * pattern_value;
+                        let image_pixels = image.pixels(x + dx, y + dy, LEN);
+                        let mut image_values = [0u16; 8];
+                        for i in 0..image_pixels.len() {
+                            image_values[i] = image_pixels[i] as u16;
+                        }
+                        let image_values = u16x8::from(image_values);
+
+                        let pattern_pixels = pattern.pixels(dx, dy, LEN);
+                        let mut pattern_values = [0u16; 8];
+                        for i in 0..pattern_pixels.len() {
+                            pattern_values[i] = pattern_pixels[i] as u16;
+                        }
+                        let pattern_values = u16x8::from(pattern_values);
+
+                        let products = image_values * pattern_values;
+
+                        for v in products.to_array() {
+                            score += v as f32;
+                        }
                     }
                 }
 

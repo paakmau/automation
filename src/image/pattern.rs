@@ -47,6 +47,11 @@ impl Pattern {
         self.image.pixel(x, y)
     }
 
+    #[inline]
+    pub fn pixels(&self, x: u32, y: u32, len: u32) -> &[u8] {
+        self.image.pixels(x, y, len)
+    }
+
     pub fn save<T>(&self, path: T) -> Result<()>
     where
         T: AsRef<Path>,

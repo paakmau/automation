@@ -27,6 +27,13 @@ impl<T: Copy> FlattenArray<T> {
     pub fn into_vec(self) -> Vec<T> {
         self.buf
     }
+
+    #[inline]
+    pub fn values(&self, y: usize, x: usize, len: usize) -> &[T] {
+        let head = y * self.width + x;
+        let tail = y * self.width + (x + len).min(self.width);
+        &self.buf[head..tail]
+    }
 }
 
 impl<T: Copy> Index<(usize, usize)> for FlattenArray<T> {
