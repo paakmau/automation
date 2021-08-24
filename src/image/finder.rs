@@ -145,8 +145,8 @@ impl<'a> Finder<'a> {
                 if score >= THRESHOLD && score > max_score {
                     max_score = score;
                     result = Some((
-                        x + (pattern.width() >> 1) << pattern.factor(),
-                        y + (pattern.height() >> 1) << pattern.factor(),
+                        (x + (pattern.width() >> 1)) * pattern.factor(),
+                        (y + (pattern.height() >> 1)) * pattern.factor(),
                     ));
                 }
             }

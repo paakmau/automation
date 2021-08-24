@@ -4,7 +4,7 @@ use image::GenericImageView;
 
 use crate::Result;
 
-use super::{flatten_array::FlattenArray, Screenshot};
+use super::{FlattenArray, Screenshot};
 
 pub(super) struct GrayImage {
     width: u32,
@@ -74,25 +74,24 @@ pub(super) struct CompressedGrayImage {
 impl CompressedGrayImage {
     #[inline]
     pub fn from_gray_image(image: &GrayImage, factor: Option<u32>) -> Self {
-        let factor = factor.unwrap_or({
-            let v = ((image.width * image.height) as f32).log10() as u32;
-            v.saturating_sub(2)
-        });
+        let factor =
+            factor.unwrap_or(((image.width * image.height / 250) as f32).sqrt().sqrt() as u32);
+        let factor = factor.max(2);
 
-        let width = image.width >> factor;
-        let height = image.height >> factor;
+        let width = image.width / factor;
+        let height = image.height / factor;
         let mut buf = FlattenArray::new(width as usize, height as usize, 0u32);
 
-        for y in 0..image.height >> factor << factor {
-            for x in 0..image.width >> factor << factor {
-                buf[(y as usize >> factor, x as usize >> factor)] += image.pixel(x, y) as u32;
+        for y in 0..image.height / factor * factor {
+            for x in 0..image.width / factor * factor {
+                buf[((y / factor) as usize, (x / factor) as usize)] += image.pixel(x, y) as u32;
             }
         }
 
         let buf = buf
             .into_vec()
             .into_iter()
-            .map(|v| (v >> factor >> factor) as u8)
+            .map(|v| (v / factor / factor) as u8)
             .collect();
 
         CompressedGrayImage {
