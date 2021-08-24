@@ -8,3 +8,4 @@ edition = "2018"
 image = "0.23"
 scrap = "0.5"
 tfc = "0.6"
+wide = { git = "https://github.com/Lokathor/wide" }
