@@ -1,11 +1,14 @@
 use std::path::Path;
 
+use wide::u16x8;
+
 use crate::Result;
 
-use super::{CompressedGrayImage, GrayImage};
+use super::{gray_image::PackedGrayImage, CompressedGrayImage, GrayImage};
 
 pub struct Pattern {
     image: CompressedGrayImage,
+    packed_image: PackedGrayImage,
     square_sum: u64,
 }
 
@@ -14,13 +17,18 @@ impl Pattern {
     pub fn from_file_buf(buf: &[u8]) -> Result<Self> {
         GrayImage::from_file_buf(buf).map(|image| {
             let image = image.into_compressed(None);
+            let packed_image = image.to_packed();
             let mut square_sum = 0u64;
             for y in 0..image.height() {
                 for x in 0..image.width() {
                     square_sum += (image.pixel(x, y) as u64).pow(2);
                 }
             }
-            Self { image, square_sum }
+            Self {
+                image,
+                packed_image,
+                square_sum,
+            }
         })
     }
 
@@ -48,8 +56,8 @@ impl Pattern {
     }
 
     #[inline]
-    pub fn pixels(&self, x: u32, y: u32, len: u32) -> &[u8] {
-        self.image.pixels(x, y, len)
+    pub fn packed_pixels(&self, x: u32, y: u32) -> &u16x8 {
+        self.packed_image.pixels(x, y)
     }
 
     pub fn save<T>(&self, path: T) -> Result<()>

@@ -2,7 +2,10 @@ use std::path::Path;
 
 use crate::Result;
 
-use super::{gray_image::GrayImage, CompressedGrayImage, FlattenArray, Pattern, Screenshot};
+use super::{
+    gray_image::{CompressedGrayImage, GrayImage},
+    FlattenArray, Pattern, Screenshot,
+};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Direction {
@@ -99,6 +102,7 @@ impl<'a> Finder<'a> {
 
         let image =
             GrayImage::from_screenshot(self.screenshot).into_compressed(Some(pattern.factor()));
+        let packed_image = image.to_redundant_packed();
         let matrix = LumaMatrix::new(&image);
 
         let mut max_score = 0f32;
@@ -125,27 +129,15 @@ impl<'a> Finder<'a> {
             for x in x_range.clone() {
                 let (y, x) = (y as u32, x as u32);
 
+                const PACK: usize = 8;
+
                 let mut score = 0f32;
-                const LEN: u32 = 8u32;
                 for dy in 0..pattern.height() {
-                    for dx in (0..pattern.width()).step_by(LEN as usize) {
-                        use wide::u16x8;
+                    for dx in (0..pattern.width()).step_by(PACK) {
+                        let image_values = packed_image.pixels(x + dx, y + dy);
+                        let pattern_values = pattern.packed_pixels(dx, dy);
 
-                        let image_pixels = image.pixels(x + dx, y + dy, LEN);
-                        let mut image_values = [0u16; 8];
-                        for i in 0..image_pixels.len() {
-                            image_values[i] = image_pixels[i] as u16;
-                        }
-                        let image_values = u16x8::from(image_values);
-
-                        let pattern_pixels = pattern.pixels(dx, dy, LEN);
-                        let mut pattern_values = [0u16; 8];
-                        for i in 0..pattern_pixels.len() {
-                            pattern_values[i] = pattern_pixels[i] as u16;
-                        }
-                        let pattern_values = u16x8::from(pattern_values);
-
-                        let products = image_values * pattern_values;
+                        let products = *image_values * *pattern_values;
 
                         for v in products.to_array() {
                             score += v as f32;
