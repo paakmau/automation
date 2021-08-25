@@ -127,7 +127,7 @@ impl<'a> Finder<'a> {
 
                 const PACK: usize = 8;
 
-                let mut score = 0f32;
+                let mut score = 0u32;
                 for dy in 0..pattern.height() {
                     for dx in (0..pattern.width()).step_by(PACK) {
                         let image_values = packed_image.pixels(x + dx, y + dy);
@@ -136,7 +136,7 @@ impl<'a> Finder<'a> {
                         let products = *image_values * *pattern_values;
 
                         for v in products.to_array() {
-                            score += v as f32;
+                            score += v as u32;
                         }
                     }
                 }
@@ -146,7 +146,7 @@ impl<'a> Finder<'a> {
                         * pattern.square_sum()) as f32)
                         .sqrt();
 
-                score /= norm;
+                let score = score as f32 / norm;
 
                 if score >= THRESHOLD && score > max_score {
                     max_score = score;
