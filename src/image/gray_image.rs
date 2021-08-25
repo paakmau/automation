@@ -70,12 +70,12 @@ impl GrayImage {
 
     #[inline]
     pub fn to_redundant_packed(&self) -> RedundantPackedGrayImage {
-        RedundantPackedGrayImage::new(self)
+        RedundantPackedGrayImage::from_gray_image(self)
     }
 
     #[inline]
     pub fn to_packed(&self) -> PackedGrayImage {
-        PackedGrayImage::new(self)
+        PackedGrayImage::from_gray_image(self)
     }
 
     #[inline]
@@ -118,7 +118,7 @@ impl RedundantPackedGrayImage {
     const PACK: usize = 8;
 
     #[inline]
-    pub fn new(image: &GrayImage) -> Self {
+    pub fn from_gray_image(image: &GrayImage) -> Self {
         let width = image.width();
         let height = image.height();
 
@@ -150,7 +150,7 @@ impl PackedGrayImage {
     const PACK: usize = 8;
 
     #[inline]
-    pub fn new(image: &GrayImage) -> Self {
+    pub fn from_gray_image(image: &GrayImage) -> Self {
         let width = image.width();
         let height = image.height();
 
