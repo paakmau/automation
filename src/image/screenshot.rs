@@ -96,10 +96,7 @@ impl Screenshot {
         let mut buf = self.bgra_buf.clone();
         Self::swap_chanel_r_and_b(&mut buf);
         let img = RgbaImage::from_raw(self.width, self.height, buf).unwrap();
-        match img.save(path) {
-            Ok(()) => Ok(()),
-            _ => Err("Unknown error".to_string()),
-        }
+        img.save(path).map_err(|_| "Unknown error".to_string())
     }
 
     fn swap_chanel_r_and_b(buf: &mut Vec<u8>) {
