@@ -135,7 +135,8 @@ impl<'a> Finder<'a> {
 
                         let products = *image_values * *pattern_values;
 
-                        for v in products.to_array() {
+                        let arr: [u16; 8] = products.into();
+                        for v in arr {
                             score += v as u32;
                         }
                     }

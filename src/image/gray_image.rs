@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use image::GenericImageView;
-use wide::u16x8;
+use simba::simd::u16x8;
 
 use crate::Result;
 
@@ -122,7 +122,7 @@ impl RedundantPackedGrayImage {
         let width = image.width();
         let height = image.height();
 
-        let mut buf = FlattenArray::new(width as usize, height as usize, u16x8::from(0u16));
+        let mut buf = FlattenArray::new(width as usize, height as usize, u16x8::from([0u16; 8]));
         for y in 0..height {
             for x in 0..width {
                 let mut pixels = [0u16; Self::PACK];
@@ -158,7 +158,7 @@ impl PackedGrayImage {
         if width as usize % Self::PACK != 0 {
             packed_width += 1;
         }
-        let mut buf = FlattenArray::new(packed_width, height as usize, u16x8::from(0u16));
+        let mut buf = FlattenArray::new(packed_width, height as usize, u16x8::from([0u16; 8]));
         for y in 0..height {
             for x in (0..width).step_by(Self::PACK) {
                 let mut pixels = [0u16; Self::PACK];

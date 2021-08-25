@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use wide::u16x8;
+use simba::simd::u16x8;
 
 use crate::Result;
 
