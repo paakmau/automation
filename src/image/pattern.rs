@@ -17,7 +17,7 @@ impl Pattern {
     #[inline]
     pub fn from_file_buf(buf: &[u8]) -> Result<Self> {
         GrayImage::from_file_buf(buf).map(|image| {
-            let factor = ((image.width() * image.height() / 250) as f32)
+            let factor = ((image.width() * image.height() / 160) as f32)
                 .sqrt()
                 .sqrt() as u32;
             let factor = factor.max(2);

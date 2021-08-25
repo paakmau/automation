@@ -69,8 +69,8 @@ impl<'a> Finder<'a> {
     }
 
     pub fn find(&self, pattern: &Pattern, dir: Direction) -> Option<(u32, u32)> {
-        const THRESHOLD: f32 = 0.98;
-        const EXACT_THRESHOLD: f32 = 0.99;
+        const THRESHOLD: f32 = 0.99;
+        const EPS: f32 = 0.005;
 
         let image = GrayImage::from_screenshot(self.screenshot).into_compressed(pattern.factor());
         let packed_image = image.to_redundant_packed();
@@ -113,16 +113,16 @@ impl<'a> Finder<'a> {
                         (y + (pattern.height() >> 1)) * pattern.factor(),
                     );
 
-                    if score > max_score {
-                        max_score = score;
-                        result = Some(center);
-                    } else if score >= EXACT_THRESHOLD {
+                    if (score - max_score).abs() <= EPS {
                         if let Some(curr_res) = result {
                             if dir.meet(curr_res, center) {
                                 max_score = score;
                                 result = Some(center);
                             }
                         }
+                    } else if score > max_score {
+                        max_score = score;
+                        result = Some(center);
                     }
                 }
             }
