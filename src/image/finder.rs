@@ -161,11 +161,4 @@ impl<'a> Finder<'a> {
 
         result
     }
-
-    pub fn save<T>(&self, path: T) -> Result<()>
-    where
-        T: AsRef<Path>,
-    {
-        self.screenshot.save(path)
-    }
 }
