@@ -1,7 +1,3 @@
-use std::path::Path;
-
-use crate::Result;
-
 use super::{FlattenArray, GrayImage, Pattern, Screenshot};
 
 #[derive(Clone, Copy, Debug)]
