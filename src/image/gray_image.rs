@@ -55,60 +55,6 @@ impl GrayImage {
     }
 
     #[inline]
-    pub fn pixel(&self, x: u32, y: u32) -> u8 {
-        self.buf[(y as usize, x as usize)]
-    }
-
-    #[inline]
-    pub fn into_compressed(self, factor: Option<u32>) -> CompressedGrayImage {
-        CompressedGrayImage::from_gray_image(&self, factor)
-    }
-}
-
-pub(super) struct CompressedGrayImage {
-    factor: u32,
-    width: u32,
-    height: u32,
-    buf: FlattenArray<u8>,
-}
-
-impl CompressedGrayImage {
-    #[inline]
-    pub fn from_gray_image(image: &GrayImage, factor: Option<u32>) -> Self {
-        let factor =
-            factor.unwrap_or(((image.width * image.height / 250) as f32).sqrt().sqrt() as u32);
-        let factor = factor.max(2);
-
-        let width = image.width / factor;
-        let height = image.height / factor;
-        let mut buf = FlattenArray::new(width as usize, height as usize, 0u32);
-
-        for y in 0..image.height / factor * factor {
-            for x in 0..image.width / factor * factor {
-                buf[((y / factor) as usize, (x / factor) as usize)] += image.pixel(x, y) as u32;
-            }
-        }
-
-        let buf = buf
-            .into_vec()
-            .into_iter()
-            .map(|v| (v / factor / factor) as u8)
-            .collect();
-        let buf = FlattenArray::from_vec(width as usize, buf);
-
-        Self {
-            factor,
-            width,
-            height,
-            buf,
-        }
-    }
-
-    #[inline]
-    pub fn factor(&self) -> u32 {
-        self.factor
-    }
-    #[inline]
     pub fn width(&self) -> u32 {
         self.width
     }
@@ -124,12 +70,34 @@ impl CompressedGrayImage {
 
     #[inline]
     pub fn to_redundant_packed(&self) -> RedundantPackedGrayImage {
-        RedundantPackedGrayImage::from_compressed_gray_image(self)
+        RedundantPackedGrayImage::new(self)
     }
 
     #[inline]
     pub fn to_packed(&self) -> PackedGrayImage {
-        PackedGrayImage::from_compressed_gray_image(self)
+        PackedGrayImage::new(self)
+    }
+
+    #[inline]
+    pub fn into_compressed(self, factor: u32) -> Self {
+        let width = self.width / factor;
+        let height = self.height / factor;
+        let mut buf = FlattenArray::new(width as usize, height as usize, 0u32);
+
+        for y in 0..self.height / factor * factor {
+            for x in 0..self.width / factor * factor {
+                buf[((y / factor) as usize, (x / factor) as usize)] += self.pixel(x, y) as u32;
+            }
+        }
+
+        let buf = buf
+            .into_vec()
+            .into_iter()
+            .map(|v| (v / factor / factor) as u8)
+            .collect();
+        let buf = FlattenArray::from_vec(width as usize, buf);
+
+        Self { width, height, buf }
     }
 
     #[inline]
@@ -150,7 +118,7 @@ impl RedundantPackedGrayImage {
     const PACK: usize = 8;
 
     #[inline]
-    pub fn from_compressed_gray_image(image: &CompressedGrayImage) -> Self {
+    pub fn new(image: &GrayImage) -> Self {
         let width = image.width();
         let height = image.height();
 
@@ -182,7 +150,7 @@ impl PackedGrayImage {
     const PACK: usize = 8;
 
     #[inline]
-    pub fn from_compressed_gray_image(image: &CompressedGrayImage) -> Self {
+    pub fn new(image: &GrayImage) -> Self {
         let width = image.width();
         let height = image.height();
 

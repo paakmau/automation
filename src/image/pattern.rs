@@ -4,10 +4,11 @@ use wide::u16x8;
 
 use crate::Result;
 
-use super::{gray_image::PackedGrayImage, CompressedGrayImage, GrayImage};
+use super::{GrayImage, PackedGrayImage};
 
 pub struct Pattern {
-    image: CompressedGrayImage,
+    factor: u32,
+    image: GrayImage,
     packed_image: PackedGrayImage,
     square_sum: u64,
 }
@@ -16,7 +17,12 @@ impl Pattern {
     #[inline]
     pub fn from_file_buf(buf: &[u8]) -> Result<Self> {
         GrayImage::from_file_buf(buf).map(|image| {
-            let image = image.into_compressed(None);
+            let factor = ((image.width() * image.height() / 250) as f32)
+                .sqrt()
+                .sqrt() as u32;
+            let factor = factor.max(2);
+
+            let image = image.into_compressed(factor);
             let packed_image = image.to_packed();
             let mut square_sum = 0u64;
             for y in 0..image.height() {
@@ -24,7 +30,9 @@ impl Pattern {
                     square_sum += (image.pixel(x, y) as u64).pow(2);
                 }
             }
+
             Self {
+                factor,
                 image,
                 packed_image,
                 square_sum,
@@ -34,7 +42,7 @@ impl Pattern {
 
     #[inline]
     pub fn factor(&self) -> u32 {
-        self.image.factor()
+        self.factor
     }
     #[inline]
     pub fn width(&self) -> u32 {

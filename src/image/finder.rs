@@ -2,10 +2,7 @@ use std::path::Path;
 
 use crate::Result;
 
-use super::{
-    gray_image::{CompressedGrayImage, GrayImage},
-    FlattenArray, Pattern, Screenshot,
-};
+use super::{FlattenArray, GrayImage, Pattern, Screenshot};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Direction {
@@ -55,7 +52,7 @@ struct LumaMatrix {
 }
 
 impl LumaMatrix {
-    fn new(image: &CompressedGrayImage) -> LumaMatrix {
+    fn new(image: &GrayImage) -> LumaMatrix {
         let mut square_sums = FlattenArray::new(
             1 + image.width() as usize,
             1 + image.height() as usize,
@@ -100,8 +97,7 @@ impl<'a> Finder<'a> {
     pub fn find(&self, pattern: &Pattern, dir: Direction) -> Option<(u32, u32)> {
         const THRESHOLD: f32 = 0.98;
 
-        let image =
-            GrayImage::from_screenshot(self.screenshot).into_compressed(Some(pattern.factor()));
+        let image = GrayImage::from_screenshot(self.screenshot).into_compressed(pattern.factor());
         let packed_image = image.to_redundant_packed();
         let matrix = LumaMatrix::new(&image);
 
