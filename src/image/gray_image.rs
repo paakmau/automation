@@ -126,8 +126,12 @@ impl RedundantPackedGrayImage {
         for y in 0..height {
             for x in 0..width {
                 let mut pixels = [0u16; Self::PACK];
-                for i in 0..Self::PACK.min((width - x) as usize) {
-                    pixels[i] = image.pixel(x + i as u32, y) as u16;
+                for (i, pixel) in pixels
+                    .iter_mut()
+                    .enumerate()
+                    .take(Self::PACK.min((width - x) as usize))
+                {
+                    *pixel = image.pixel(x + i as u32, y) as u16;
                 }
                 buf[(y as usize, x as usize)] = u16x8::from(pixels);
             }
@@ -162,8 +166,12 @@ impl PackedGrayImage {
         for y in 0..height {
             for x in (0..width).step_by(Self::PACK) {
                 let mut pixels = [0u16; Self::PACK];
-                for i in 0..Self::PACK.min((width - x) as usize) {
-                    pixels[i] = image.pixel(x + i as u32, y) as u16;
+                for (i, pixel) in pixels
+                    .iter_mut()
+                    .enumerate()
+                    .take(Self::PACK.min((width - x) as usize))
+                {
+                    *pixel = image.pixel(x + i as u32, y) as u16;
                 }
                 buf[(y as usize, x as usize / Self::PACK)] = u16x8::from(pixels);
             }

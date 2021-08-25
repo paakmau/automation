@@ -34,8 +34,8 @@ impl<'a> Pixel<'a> {
         const BGR_LUMA_FACTOR: [u32; 3] = [722, 7152, 2126];
         const SCALE: u32 = 10000;
         let mut luma = 0u32;
-        for i in 0..BGR_LUMA_FACTOR.len() {
-            luma += self.bgra[i] as u32 * BGR_LUMA_FACTOR[i];
+        for (i, factor) in BGR_LUMA_FACTOR.iter().enumerate() {
+            luma += self.bgra[i] as u32 * factor;
         }
         (luma / SCALE) as u8
     }
