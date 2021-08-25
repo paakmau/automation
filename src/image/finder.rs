@@ -1,42 +1,20 @@
 use super::{FlattenArray, GrayImage, Pattern, Screenshot};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Direction {
-    RightDown,
-    RightUp,
-    LeftDown,
-    LeftUp,
+    Up,
+    Down,
+    Left,
+    Right,
 }
 
-#[derive(Clone)]
-struct StepRange(i32, i32, i32); // Start, end, and step
-
-impl StepRange {
-    fn into_rev(mut self) -> Self {
-        self.0 -= 1;
-        self.1 -= 1;
-
-        // Swap
-        let v = self.0;
-        self.0 = self.1;
-        self.1 = v;
-
-        self.2 = -self.2;
-        self
-    }
-}
-
-impl Iterator for StepRange {
-    type Item = i32;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        if (self.1 - self.0) * self.2 > 0 {
-            let v = self.0;
-            self.0 += self.2;
-            Some(v)
-        } else {
-            None
+impl Direction {
+    pub fn meet(&self, from: (u32, u32), to: (u32, u32)) -> bool {
+        match self {
+            Direction::Up => to.1 < from.1,
+            Direction::Down => to.1 > from.1,
+            Direction::Left => to.0 < from.0,
+            Direction::Right => to.0 > from.0,
         }
     }
 }
@@ -92,6 +70,7 @@ impl<'a> Finder<'a> {
 
     pub fn find(&self, pattern: &Pattern, dir: Direction) -> Option<(u32, u32)> {
         const THRESHOLD: f32 = 0.98;
+        const EXACT_THRESHOLD: f32 = 0.99;
 
         let image = GrayImage::from_screenshot(self.screenshot).into_compressed(pattern.factor());
         let packed_image = image.to_redundant_packed();
@@ -100,25 +79,8 @@ impl<'a> Finder<'a> {
         let mut max_score = 0f32;
         let mut result = None;
 
-        let mut y_range = StepRange(0, (matrix.height - pattern.height() + 1) as i32, 1);
-        let mut x_range = StepRange(0, (matrix.width - pattern.width() + 1) as i32, 1);
-
-        match dir {
-            Direction::RightDown => {}
-            Direction::RightUp => {
-                y_range = y_range.into_rev();
-            }
-            Direction::LeftDown => {
-                x_range = x_range.into_rev();
-            }
-            Direction::LeftUp => {
-                y_range = y_range.into_rev();
-                x_range = x_range.into_rev();
-            }
-        };
-
-        for y in y_range {
-            for x in x_range.clone() {
+        for y in 0..matrix.height - pattern.height() + 1 {
+            for x in 0..matrix.width - pattern.width() + 1 {
                 let (y, x) = (y as u32, x as u32);
 
                 const PACK: usize = 8;
@@ -145,12 +107,23 @@ impl<'a> Finder<'a> {
 
                 let score = score as f32 / norm;
 
-                if score >= THRESHOLD && score > max_score {
-                    max_score = score;
-                    result = Some((
+                if score >= THRESHOLD {
+                    let center = (
                         (x + (pattern.width() >> 1)) * pattern.factor(),
                         (y + (pattern.height() >> 1)) * pattern.factor(),
-                    ));
+                    );
+
+                    if score > max_score {
+                        max_score = score;
+                        result = Some(center);
+                    } else if score >= EXACT_THRESHOLD {
+                        if let Some(curr_res) = result {
+                            if dir.meet(curr_res, center) {
+                                max_score = score;
+                                result = Some(center);
+                            }
+                        }
+                    }
                 }
             }
         }
