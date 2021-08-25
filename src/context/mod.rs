@@ -23,3 +23,9 @@ impl Context {
         &mut self.simulator
     }
 }
+
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
+    }
+}

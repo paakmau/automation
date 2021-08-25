@@ -44,3 +44,9 @@ impl Capturer {
         }
     }
 }
+
+impl Default for Capturer {
+    fn default() -> Self {
+        Self::new()
+    }
+}

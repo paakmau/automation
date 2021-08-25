@@ -45,3 +45,9 @@ impl Simulator {
             .expect("Failed to simulate mouse scrolling");
     }
 }
+
+impl Default for Simulator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
