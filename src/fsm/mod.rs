@@ -29,8 +29,8 @@ impl<C, S: State<C>> Node<C, S> {
     pub fn new(state: S) -> Node<C, S> {
         Node {
             _ctx_type: PhantomData,
-            in_set: HashSet::new(),
-            out_set: HashSet::new(),
+            in_set: Default::default(),
+            out_set: Default::default(),
             state,
         }
     }
@@ -98,8 +98,8 @@ impl<C, S: State<C>, T: Transition<C, S>> Fsm<C, S, T> {
     pub fn new(entry_state: S, exit_state: S) -> Fsm<C, S, T> {
         let mut fsm = Fsm {
             _ctx_type: PhantomData,
-            node_map: HashMap::new(),
-            edge_map: HashMap::new(),
+            node_map: Default::default(),
+            edge_map: Default::default(),
             entry_state_id: StateId(0),
             exit_state_id: StateId(0),
             exited: false,

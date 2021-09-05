@@ -12,8 +12,8 @@ pub struct Context {
 impl Context {
     pub fn new() -> Context {
         Context {
-            capturer: Capturer::new(),
-            simulator: Simulator::new(),
+            capturer: Default::default(),
+            simulator: Default::default(),
         }
     }
     pub fn capturer_mut(&mut self) -> &mut Capturer {
