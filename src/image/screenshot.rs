@@ -35,7 +35,7 @@ impl<'a> Pixel<'a> {
         const SCALE: u32 = 10000;
         let mut luma = 0u32;
         for (v, factor) in self.bgra.iter().zip(BGR_LUMA_FACTOR.iter()) {
-            luma += v as u32 * factor;
+            luma += *v as u32 * factor;
         }
         (luma / SCALE) as u8
     }
