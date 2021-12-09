@@ -248,20 +248,18 @@ mod tests {
 
     impl State<Context> for ActionState {
         fn enter(&mut self, _ctx: &mut Context) {
-            match self {
-                ActionState::Eat {
-                    food: _,
-                    food_sum,
-                    food_count,
-                } => {
-                    // Eat one immediately while entering
-                    if *food_sum > 0 {
-                        *food_count = *food_sum - 1;
-                    } else {
-                        *food_count = 0;
-                    }
+            if let ActionState::Eat {
+                food: _,
+                food_sum,
+                food_count,
+            } = self
+            {
+                // Eat one immediately while entering
+                if *food_sum > 0 {
+                    *food_count = *food_sum - 1;
+                } else {
+                    *food_count = 0;
                 }
-                _ => {}
             }
         }
 
@@ -274,7 +272,7 @@ mod tests {
                 } => {
                     // Eat one per tick
                     if *food_count > 0 {
-                        *food_count = *food_count - 1;
+                        *food_count -= 1;
                     } else {
                         *food_count = 0;
                     }
