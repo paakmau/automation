@@ -283,7 +283,7 @@ mod tests {
 
                 ActionState::Nap { tick_time } => {
                     if *tick_time > 0 {
-                        *tick_time = *tick_time - 1;
+                        *tick_time -= 1;
                     } else {
                         *tick_time = 0;
                     }
