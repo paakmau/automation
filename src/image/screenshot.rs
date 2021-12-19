@@ -60,6 +60,18 @@ impl Screenshot {
         })
     }
 
+    pub fn from_file_buf(buf: &[u8]) -> Result<Self> {
+        match image::load_from_memory(buf) {
+            Ok(dyn_img) => Ok(Screenshot::from_bgra_buf(
+                dyn_img.width(),
+                dyn_img.height(),
+                dyn_img.into_bgra8().into_raw(),
+            )
+            .unwrap()),
+            _ => Err("Unknown error".to_string()),
+        }
+    }
+
     pub fn from_file<T>(path: T) -> Result<Self>
     where
         T: AsRef<Path>,
