@@ -81,8 +81,6 @@ impl<'a> Finder<'a> {
 
         for y in 0..matrix.height - pattern.height() + 1 {
             for x in 0..matrix.width - pattern.width() + 1 {
-                let (y, x) = (y as u32, x as u32);
-
                 const PACK: usize = 8;
 
                 let mut score = 0u32;
