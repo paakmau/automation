@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use image::GenericImageView;
-use simba::simd::u16x8;
+use std::simd::u16x8;
 
 use crate::Result;
 
